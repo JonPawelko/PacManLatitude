@@ -1,5 +1,5 @@
 body {
-    /* background-color: 		#000000; */
+    background-color: #00ff80;
 }
 
 #board
@@ -7,19 +7,20 @@ body {
     display: flex;
     flex-direction: row;
     flex-wrap:wrap;
-    width: 100px;
-    height: 100px;
+    width: 500px;
+    height: 500px;
     /* justify-content:flex-start; */
     /* visibility: hidden; */
-    /* background-color: 	#B22222 */
+    background-color: #ff0000
 }
 
 /* Use the . because square is a class */
   .square {
-    height: 50px;
-    width: 50px;
+    height: 100px;
+    width: 100px;
     box-sizing: border-box;
-    border: 1px solid black;
+    border: 1px solid rgb(0, 255, 221);
+    /* background-image: "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.pngmart.com%2Ffiles%2F19%2FMs-Pacman-PNG-Free-Download.png&f=1&nofb=1&ipt=4f720d1d1e263bdfabe8147e1d39c8579cc26f878571ec0ec4f3565021a70f36&ipo=images"; */
     /* font-size: 3em; */
     /* display: flex; */
     /* justify-content: center; */
