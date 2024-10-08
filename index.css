@@ -7,8 +7,8 @@ body {
     display: flex;
     flex-direction: row;
     flex-wrap:wrap;
-    width: 100px;
-    height: 100px;
+    width: 500px;
+    height: 500px;
     /* justify-content:flex-start; */
     /* visibility: hidden; */
     /* background-color: 	#B22222 */
@@ -16,8 +16,8 @@ body {
 
 /* Use the . because square is a class */
   .square {
-    height: 50px;
-    width: 50px;
+    height: 100px;
+    width: 100px;
     box-sizing: border-box;
     border: 1px solid black;
     /* font-size: 3em; */
