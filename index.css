@@ -7,8 +7,8 @@ body {
     display: flex;
     flex-direction: row;
     flex-wrap:wrap;
-    width: 500px;
-    height: 500px;
+    width: 750px;
+    height: 750px;
     /* justify-content:flex-start; */
     /* visibility: hidden; */
     background-color: #ff0000
@@ -16,8 +16,8 @@ body {
 
 /* Use the . because square is a class */
   .square {
-    height: 100px;
-    width: 100px;
+    height: 75px;
+    width: 75px;
     box-sizing: border-box;
     border: 1px solid rgb(0, 255, 221);
     /* background-image: "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.pngmart.com%2Ffiles%2F19%2FMs-Pacman-PNG-Free-Download.png&f=1&nofb=1&ipt=4f720d1d1e263bdfabe8147e1d39c8579cc26f878571ec0ec4f3565021a70f36&ipo=images"; */
