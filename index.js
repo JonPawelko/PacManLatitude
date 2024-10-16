@@ -14,9 +14,22 @@ var ARROW_DOWN = 40;
 const FAIL = 0;
 const SUCCESS = 1;
 
-var walls = new Array;
+var PACMAN_CLASSIC_RIGHT = "<img src='graphics/Pacman icon right.jpg'>";
+var PACMAN_CLASSIC_LEFT = "<img src='graphics/Pacman icon left.jpg'>";
+var PACMAN_CLASSIC_UP = "<img src='graphics/Pacman icon up.jpg'>";
+var PACMAN_CLASSIC_DOWN = "<img src='graphics/Pacman icon down.jpg'>";
+var PACMAN_CLASSIC_RIGHT_PP = "<img src='graphics/Pacman icon right PP.jpg'>";
+var PACMAN_CLASSIC_LEFT_PP = "<img src='graphics/Pacman icon left PP.jpg'>";
+var PACMAN_CLASSIC_UP_PP = "<img src='graphics/Pacman icon up PP.jpg'>";
+var PACMAN_CLASSIC_DOWN_PP = "<img src='graphics/Pacman icon down PP.jpg'>";
+var ICON_WALL = "<img src='graphics/wallIcon.jpg'>";
 
+// -------------------------------------------------------------------
+// Initialize global variables
+
+var walls = new Array;
 document.onkeydown = checkKey;
+var pacmanIcon;
 
 // ---------------------------------------
 // Initialize game components
@@ -42,13 +55,13 @@ function drawInitialBoard()
 {
   squares = document.querySelectorAll('.square');  // get squares
 
-  squares[current].innerHTML = "X";   // set PacMan's current position
+  squares[current].innerHTML = PACMAN_CLASSIC_RIGHT;   // set PacMan's current position
 
   for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)  // loop through walls array, assume squares empty
   {
     if (walls[i] == 1)
     {
-      squares[i].innerHTML = "Z";
+      squares[i].innerHTML = ICON_WALL;
     }
   }
 
@@ -74,7 +87,7 @@ function redrawBoard(oldSquare, newSquare)
 
       squares[oldSquare].innerHTML = "";   // blank for now, but might have 2 ghosts later ***
 
-      squares[newSquare].innerHTML = "X"; // set pac man on new current
+      squares[newSquare].innerHTML = pacmanIcon; // set pac man on new current
 
 }
 
@@ -90,6 +103,7 @@ function resolvePacMan(direction)
       if ( (((current + 1) % NUM_COLUMNS) != 0) && (walls[current+1] == 0) )
       {
         current++;
+        pacmanIcon = PACMAN_CLASSIC_RIGHT;
         return SUCCESS;
       }
       break;
@@ -99,6 +113,7 @@ function resolvePacMan(direction)
       if ( ((current % NUM_COLUMNS) != 0) && (walls[current-1] == 0) )
       {
         current--;
+        pacmanIcon = PACMAN_CLASSIC_LEFT;
         return SUCCESS;
       }
       break;
@@ -108,6 +123,7 @@ function resolvePacMan(direction)
       if ((current < NUM_COLUMNS * (NUM_ROWS-1)) && (walls[current+NUM_COLUMNS] == 0))
       {
         current = current + NUM_COLUMNS;
+        pacmanIcon = PACMAN_CLASSIC_DOWN;
         return SUCCESS;
       }
       break;
@@ -117,6 +133,7 @@ function resolvePacMan(direction)
       if ((current >= NUM_COLUMNS) && (walls[current-NUM_COLUMNS] == 0))
       {
         current = current - NUM_COLUMNS;
+        pacmanIcon = PACMAN_CLASSIC_UP;
         return SUCCESS;
       }
       break;
