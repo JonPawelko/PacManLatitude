@@ -1,16 +1,20 @@
-
 var NUM_ROWS = 10;
 var NUM_COLUMNS = 10;
-var current = 0;
-var squares;
-var tickCounter = 0;
+var current = 0;    // pacman's current square
+var squares;        // squares on the board
 
-// key codes
+// keyboard codes
 var SPACE_BAR_KEY = 32;
 var ARROW_LEFT = 37;
 var ARROW_UP = 38;
 var ARROW_RIGHT = 39;
 var ARROW_DOWN = 40;
+
+// general constants to denote direction
+var RIGHT = 0;
+var LEFT = 1;
+var DOWN = 2;
+var UP = 3;
 
 const FAIL = 0;
 const SUCCESS = 1;
@@ -44,10 +48,13 @@ var totalPellets = 0;
 var pelletsEaten = 0;
 var score = 0;
 
-document.onkeydown = checkKey;
-var pacmanIcon;
+document.onkeydown = checkKey;  // checkKey is function called when key pressed
+var pacmanIcon;   // stores which icon pacman should use based on direction
 
-// ---------------------------------------
+// ----------------------------------------------------
+// -----   Start Main Driver section  -----------------
+// ----------------------------------------------------
+
 // Initialize game components
 
 buildWallsAndPellets();
@@ -56,9 +63,16 @@ drawInitialBoard();
 
 spawnPacman();
 
-spawnGhost();
+spawnGhost();   // currently just spawns 1 ghost that does not die
 
-// ---------------------------------------
+// ----------------------------------------------------
+// -----   End Main Driver section  -----------------
+// ----------------------------------------------------
+
+// ---------------------------------------------------------
+// Start of Set up game function section -------------------
+// ---------------------------------------------------------
+
 // Intercept keydown event
 
 function checkKey(evt)
@@ -70,52 +84,7 @@ function checkKey(evt)
 
 }
 
-// ---------------------------------------
-
-function drawInitialBoard()
-{
-  squares = document.querySelectorAll('.square');  // get squares
-
-  squares[current].innerHTML = PACMAN_CLASSIC_RIGHT;   // set PacMan's current position
-
-  for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)  // loop through walls array, check for wall or pellet
-  {
-    if (walls[i] == 1)
-    {
-        squares[i].innerHTML = ICON_WALL;
-    }
-    else
-    {
-        if (pellets[i] == 1)
-        {
-          squares[i].innerHTML = ICON_PELLET;
-        }
-    }
-
-  } // end for loop
-
-}  // end function
-
-// ---------------------------------------
-
-function spawnPacman()
-{
-    var i = 0;
-    squares = document.querySelectorAll('.square');  // faster to get first?
-
-    while (i < walls.length)
-    {
-      if (walls[i++] == 0)
-      {
-        current = i-1;
-        squares[current].innerHTML = PACMAN_CLASSIC_RIGHT;
-        return;
-      }
-    } // end while loop
-
-}  // end function
-
-// ---------------------------------------
+// --------------------------------------------------------------------
 
 function buildWallsAndPellets()
 {
@@ -130,20 +99,78 @@ function buildWallsAndPellets()
       }
       else
       {
+          // push a 1 onto pellets array, 0 onto walls array
           walls.push(0);
           pellets.push(1);
           totalPellets++;
       }
 
-  }
+  } // end for loop
 
 }
 
-// --------------------------------------
+// -------------------------------------------------------------------------
+
+function drawInitialBoard()
+{
+  squares = document.querySelectorAll('.square');  // get squares
+
+  squares[current].innerHTML = PACMAN_CLASSIC_RIGHT;   // set PacMan's current position
+
+  for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)  // loop through walls array, check for wall or pellet
+  {
+    // check for wall first
+    if (walls[i] == 1)
+    {
+        squares[i].innerHTML = ICON_WALL;
+    }
+    else
+    {
+        // if no wall, check for pellet
+        if (pellets[i] == 1)
+        {
+          squares[i].innerHTML = ICON_PELLET;
+        }
+    }
+
+  } // end for loop
+
+}  // end function
+
+// ---------------------------------------------------------
+// End of Set up game function section ---------------------
+// ---------------------------------------------------------
+
+// ************************************************************************
+
+// --------------------------------------------
+// -----  Start Pac Man function section ------
+// --------------------------------------------
+
+function spawnPacman()
+{
+    var i = 0;
+    squares = document.querySelectorAll('.square');  // faster to get first?
+
+    // put pacman on first square not a wall
+
+    while (i < walls.length)
+    {
+      if (walls[i++] == 0)
+      {
+        current = i-1;
+        squares[current].innerHTML = PACMAN_CLASSIC_RIGHT;
+        return;
+      }
+    } // end while loop
+
+}  // end function
+
+// ----------------------------------------------------------------
 
 function redrawBoardPacman(oldSquare, newSquare)
 {
-      squares = document.querySelectorAll('.square');  // faster to get first?
+      squares = document.querySelectorAll('.square');
 
       squares[oldSquare].innerHTML = "";   // From square always blank after Pacman leaves
 
@@ -151,7 +178,8 @@ function redrawBoardPacman(oldSquare, newSquare)
 
 }
 
-// ---------------------------------------
+// -------------------------------------------------------------
+// function checks for a pellet and eats it if there
 
 function checkForPellet()
 {
@@ -163,13 +191,12 @@ function checkForPellet()
     }
 }
 
-// ---------------------------------------
+// -------------------------------------------------------------
 
 function resolvePacMan(direction)
 {
   switch(direction)
   {
-
     case ARROW_RIGHT:
 
       if ( (((current + 1) % NUM_COLUMNS) != 0) && (walls[current+1] == 0) )
@@ -230,28 +257,15 @@ function resolvePacMan(direction)
 
 } // end function
 
-// -------------------------------------------
+// --------------------------------------------
+// -----  End Pac Man function section ------
+// --------------------------------------------
 
-function ghostTick(ghostId)
-{
-  // dir 0 = right, 1 = down, 2 = left, 3 = up
-  var dir = Math.floor(Math.random() * 4);  // returns a random int between 0 and 3
+// ************************************************************************
 
-  // Will continue to work on this over the next several days
-
-
-  //  squares = document.querySelectorAll('.square');  // faster to get first?
-  //
-  // squares[99].innerHTML = tickCounter++;
-  //
-  // if (tickCounter == 4)
-  // {
-  //   clearInterval(ghostTimerID);
-  // }
-
-}
-
-// -------------------------------------------
+// -------------------------------------------------
+// ---------  Start Ghost function section ---------
+// -------------------------------------------------
 
 function spawnGhost()
 {
@@ -262,15 +276,172 @@ function spawnGhost()
     tempSquare--;
 
   // create timer thread
-  var tempTimerId = setInterval(ghostTick, 1000, ghosts.length-1);
+  var tempTimerId = setInterval(ghostTick, 3000, ghosts.length);
 
   // push ghost onto array with it's timer id and location
   ghosts.push({squareNum:tempSquare, timerID: tempTimerId});
 
   console.log(ghosts);
 
-  // Draw ghost on board.  Later redraws handled by timer function
+  // Draw ghost on board.  Later redraws are handled by the tick timer function
   var squares = document.querySelectorAll('.square');  // faster to get first?
   squares[tempSquare].innerHTML = ICON_GHOST;
 
 }
+
+// ---------------------------------------------------------------------
+// function called for each ghost, each tick.
+// ghost id in the array passed in
+
+function ghostTick(ghostId)
+{
+  var legalMove = FAIL;
+  var tries = 0;
+  var dir; // dir 0 = right, 1 = left, 2 = up, 3 = down
+
+  // loop until a legal move is found or 15 tries
+  while ((legalMove == FAIL) && (tries < 15))
+  {
+    dir = Math.floor(Math.random() * 4);  // returns a random int between 0 and 3
+
+    // determine if legal move
+    legalMove = legalGhostMove(ghostId,dir);
+
+    if (legalMove == FAIL)
+    {
+      tries++;
+    }
+    else
+    {
+        // save old square number before resolving ghost move
+        var oldSquare = ghosts[ghostId].squareNum;
+        resolveGhost(ghostId,dir);
+        redrawBoardGhost(ghostId, oldSquare); // redraw check always needed if legal move
+    }
+
+  } // end while loop
+
+} // end function
+
+// -----------------------------------------------------------------------
+// Checks for internal and external walls
+
+function legalGhostMove(ghostId,dir)
+{
+
+  // switch on each possible direction
+  switch(dir)
+  {
+    case RIGHT:
+
+      if ( (((ghosts[ghostId].squareNum + 1) % NUM_COLUMNS) != 0) && (walls[(ghosts[ghostId].squareNum)+1] == 0) )
+      {
+        return SUCCESS;
+      }
+      else
+      {
+        return FAIL;
+      }
+      break;
+
+    case LEFT:
+
+      if ( ((ghosts[ghostId].squareNum % NUM_COLUMNS) != 0) && (walls[ghosts[ghostId].squareNum-1] == 0) )
+      {
+        return SUCCESS;
+      }
+      else
+      {
+        return FAIL;
+      }
+      break;
+
+    case DOWN:
+
+      if ((ghosts[ghostId].squareNum < NUM_COLUMNS * (NUM_ROWS-1)) && (walls[ghosts[ghostId].squareNum+NUM_COLUMNS] == 0))
+      {
+        return SUCCESS;
+      }
+      else
+      {
+        return FAIL;
+      }
+      break;
+
+    case UP:
+
+      if ((ghosts[ghostId].squareNum >= NUM_COLUMNS) && (walls[ghosts[ghostId].squareNum-NUM_COLUMNS] == 0))
+      {
+        return SUCCESS;
+      }
+      else
+      {
+        return FAIL;
+      }
+      break;
+
+    default:
+
+      return FAIL;
+
+  } // end switch
+
+}
+
+// -----------------------------------------------------------------------
+// Update ghost data
+
+function resolveGhost(ghostId,dir)
+{
+
+    switch(dir)
+    {
+      case RIGHT:
+
+        ghosts[ghostId].squareNum++;
+        break;
+
+      case LEFT:
+
+        ghosts[ghostId].squareNum--;
+        break;
+
+      case DOWN:
+
+        ghosts[ghostId].squareNum += NUM_COLUMNS;
+        break;
+
+      case UP:
+
+        ghosts[ghostId].squareNum -= NUM_COLUMNS;
+        break;
+
+    } // end switch
+
+}
+
+// ----------------------------------------------------------------------
+
+function redrawBoardGhost(ghostId, oldSquare)
+{
+      squares = document.querySelectorAll('.square');
+
+      squares[ghosts[ghostId].squareNum].innerHTML = ICON_GHOST;
+
+      // Check what needs to be in old square, for now, only a pellet 
+      if (pellets[oldSquare] == 1)
+      {
+          squares[oldSquare].innerHTML = ICON_PELLET;
+      }
+      else  // square is blank
+      {
+          squares[oldSquare].innerHTML = "";
+      }
+
+}
+
+// -------------------------------------------------
+// ---------  End Ghost function section ---------
+// -------------------------------------------------
+
+// ************************************************************************
