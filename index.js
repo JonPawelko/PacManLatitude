@@ -11,6 +11,7 @@ const LIVES_START = 3
 const BOMBS_START_COUNT = 10;
 const POWER_PELLETS_START_COUNT = 3;
 const POINTS_PER_GHOST = 10;
+const POWER_PELLET_DELAY = 8; // seconds
 
 var current;    // pacman's current square
 var lives;
@@ -25,6 +26,7 @@ var pelletsEaten;   // total pellets eaten in the game
 var numPowerPellets;  // number of power pellets per board
 var score;
 var gameMode;         // mode is either "regular" (ghosts kill pacman) or "power pellet" (pacman kills ghosts)
+var myPowerPelletTimerVar;
 
 // General Constants ----------------------------
 
@@ -86,6 +88,7 @@ lives = LIVES_START;
 bombs = BOMBS_START_COUNT;
 level = 1;
 gameMode = GAME_MODE_POWER_OFF;
+myPowerPelletTimerVar = -1;  // stays -1 if the timer is never used, otherwise stores actual value.  Only need 1.
 
 document.onkeydown = checkKey;  // checkKey is function called when key pressed
 var pacmanIcon;   // stores which icon pacman should use based on direction
@@ -111,7 +114,7 @@ spawnPacman();
 // spawnGhost((NUM_ROWS*NUM_COLUMNS)-1);   // pass in starting sqaure, currently just spawns 1 ghost that does not die
 // spawnGhost(Math.floor(NUM_ROWS*NUM_COLUMNS/2)); // near middle of board
 
-// spawnGhost(2);   // pass in starting sqaure, currently just spawns 1 ghost that does not die
+spawnGhost(2);   // pass in starting square
 spawnGhost(12); // near middle of board
 
 // ----------------------------------------------------
@@ -368,8 +371,19 @@ function checkForPellets()
           score++;
           document.getElementById("scoreVariable").innerHTML = score;
           powerPellets[current] = 0;
-      }
-    }
+
+          if (myPowerPelletTimerVar != -1)
+          {
+              // clear an old one if it's still running
+              clearTimeout(myPowerPelletTimerVar);
+          }
+
+          // launch the pp timer
+          myPowerPelletTimerVar = setTimeout(myPowerPelletTimer, POWER_PELLET_DELAY * 1000);
+
+      }   // end if PP found
+
+    } // end else
 
 } // end function checkForPellets
 
@@ -527,11 +541,48 @@ function eatGhosts()
 
       console.log("Ghosts squarenum is " + ghosts[i].squareNum);
 
+      // spawn a new ghost
+      reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
+
     }
 
   }  // end for loop
 
 } // end function eatGhosts
+
+// ----------------------------------------------------------------
+
+function myPowerPelletTimer()
+{
+    gameMode = GAME_MODE_POWER_OFF;
+    myPowerPelletTimerVar = -1;
+
+    switch (pacmanIcon) {
+
+      case PACMAN_CLASSIC_RIGHT_PP:
+          pacmanIcon = PACMAN_CLASSIC_RIGHT;
+          break;
+
+      case PACMAN_CLASSIC_LEFT_PP:
+          pacmanIcon = PACMAN_CLASSIC_LEFT;
+          break;
+
+      case PACMAN_CLASSIC_UP_PP:
+          pacmanIcon = PACMAN_CLASSIC_UP;
+          break;
+
+      case PACMAN_CLASSIC_DOWN_PP:
+          pacmanIcon = PACMAN_CLASSIC_DOWN;
+          break;
+
+      default:
+
+    } // end switch
+
+    squares = document.querySelectorAll('.square');  // faster to get first?
+    squares[current].innerHTML = pacmanIcon;
+
+}
 
 //
 // --------------------------------------------
@@ -561,6 +612,34 @@ function spawnGhost(squareNum)
   // Draw ghost on board.  Later redraws are handled by the tick timer function
   squares = document.querySelectorAll('.square');  // faster to get first?
   squares[squareNum].innerHTML = ICON_GHOST;
+
+} // end function spawnGhost
+
+// ---------------------------------------------------------------------
+
+function reSpawnGhost(squareNum)
+{
+  // make sure now spawing directly on pacman or within 1 square
+
+  var safeSquareFound = false;
+
+  while (safeSquareFound == false)
+  {
+      if (!((walls[squareNum] == 1) || (current == squareNum) || (current == squareNum+1) || (current == squareNum-1) || (current == squareNum+NUM_COLUMNS) || (current == squareNum-NUM_COLUMNS)))
+        safeSquareFound = true;
+      else {
+        // increase squareNum and try again
+        squareNum++;
+      }
+  }
+
+  // create timer thread
+  var tempTimerId = setInterval(ghostTick, 3000, ghosts.length);
+
+  // push ghost onto array with it's timer id and location
+  ghosts.push({squareNum:squareNum, timerID: tempTimerId});
+
+  // Later redraws are handled by the tick timer function
 
 } // end function spawnGhost
 
