@@ -22,8 +22,9 @@ var bombs;
 var squares;        // squares on the board
 var score;
 var totalPellets;   // total pellets placed on current board
-var pelletsEaten;   // total pellets eaten in the game
+var pelletsEaten;   // total pellets eaten on the board
 var numPowerPellets;  // number of power pellets per board
+var numPowerPelletsEaten;
 var score;
 var gameMode;         // mode is either "regular" (ghosts kill pacman) or "power pellet" (pacman kills ghosts)
 var myPowerPelletTimerVar;
@@ -75,13 +76,14 @@ const OFF_THE_BOARD = -1;  // square num when dead or off the board
 // -------------------------------------------------------------------
 // Initialize global variables
 
-var walls = new Array;
-var pellets = new Array;
-var powerPellets = new Array;
+var walls;
+var pellets;
+var powerPellets;
 var ghosts = new Array;
 
 totalPellets = 0;
 pelletsEaten = 0;
+numPowerPelletsEaten = 0;
 numPowerPellets = POWER_PELLETS_START_COUNT;
 score = 0;
 lives = LIVES_START;
@@ -101,7 +103,7 @@ var pacmanIcon;   // stores which icon pacman should use based on direction
 
 createBoard();
 
-initializeScoreboard();
+updateScoreboard();
 
 buildWallsAndPellets();
 
@@ -122,7 +124,7 @@ spawnGhost(12); // near middle of board
 // ----------------------------------------------------
 
 // ---------------------------------------------------------
-// Start of Set up game function section -------------------
+// Start of game management function section -------------------
 // ---------------------------------------------------------
 
 // Intercept keydown event
@@ -161,7 +163,7 @@ function createBoard()
 
 // -----------------------------------------------------------
 
-function initializeScoreboard()
+function updateScoreboard()
 {
   document.getElementById("livesVariable").innerHTML = lives;
   document.getElementById("scoreVariable").innerHTML = score;
@@ -173,6 +175,10 @@ function initializeScoreboard()
 
 function buildWallsAndPellets()
 {
+  // deletes old arrays if exist
+  walls = new Array;
+  pellets = new Array;
+
   for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)
   {
       var temp = Math.random();   // random # between 0 and 1
@@ -201,6 +207,9 @@ function createPowerPellets()
   var squareFound = false;
   var i;
 
+  // reset pp array if it exists
+  powerPellets = new Array;
+
   // default array to zeros
   for (i=0; i< NUM_ROWS*NUM_COLUMNS; i++)
     powerPellets[i] = 0;
@@ -217,6 +226,7 @@ function createPowerPellets()
       {
         squareFound = true;
         pellets[ppSquare] = 0;
+        totalPellets--;
         powerPellets[ppSquare] = 1;
       }  // end if
     } // end while
@@ -260,7 +270,41 @@ function drawInitialBoard()
 }  // end function drawInitialBoard
 
 // ---------------------------------------------------------
-// End of Set up game function section ---------------------
+// function called after pacman completes a level
+
+function resetBoard()
+{
+    totalPellets = 0;
+    pelletsEaten = 0;
+    numPowerPelletsEaten = 0;
+    numPowerPellets = POWER_PELLETS_START_COUNT;
+
+    current = -1;
+    level++;
+    gameMode = GAME_MODE_POWER_OFF;
+
+    if (myPowerPelletTimerVar != -1)
+    {
+      clearTimeout(myPowerPelletTimerVar);
+      myPowerPelletTimerVar = -1;
+    }
+
+    updateScoreboard();
+
+    buildWallsAndPellets();
+
+    createPowerPellets();
+
+    drawInitialBoard();
+
+    setTimeout( respawnPacmanTimer, RESET_PLAYER_DELAY*1000);
+
+}
+
+// End function resetBoard ---------------------------------
+
+// ---------------------------------------------------------
+// End of game management function section ---------------------
 // ---------------------------------------------------------
 
 // ************************************************************************
@@ -281,7 +325,8 @@ function spawnPacman()
       if (walls[i++] == 0)
       {
         current = i-1;
-        squares[current].innerHTML = PACMAN_CLASSIC_RIGHT;
+        pacmanIcon = PACMAN_CLASSIC_RIGHT;
+        squares[current].innerHTML = pacmanIcon;
         checkForPellets();
 
         return;
@@ -371,6 +416,7 @@ function checkForPellets()
           score++;
           document.getElementById("scoreVariable").innerHTML = score;
           powerPellets[current] = 0;
+          numPowerPelletsEaten++;
 
           if (myPowerPelletTimerVar != -1)
           {
@@ -385,6 +431,12 @@ function checkForPellets()
 
     } // end else
 
+    console.log("Total pellets is " + totalPellets + " pellets eaten is " + pelletsEaten + "  power pellets eaten is " + numPowerPelletsEaten + " pp per screen is " + POWER_PELLETS_START_COUNT);
+
+    if ((pelletsEaten == totalPellets) && (numPowerPelletsEaten = POWER_PELLETS_START_COUNT))
+    {
+      resetBoard();
+    }
 } // end function checkForPellets
 
 // -------------------------------------------------------------
@@ -417,8 +469,16 @@ function resolvePacMan(direction)
 
           checkForPellets();
 
-          pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_RIGHT_PP : PACMAN_CLASSIC_RIGHT;
-          return SUCCESS;
+          // Might have finished board
+          if (current != -1)
+          {
+            pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_RIGHT_PP : PACMAN_CLASSIC_RIGHT;
+            return SUCCESS;
+          }
+          else
+          {
+            return FAIL;
+          }
       }
 
       break;
@@ -445,8 +505,16 @@ function resolvePacMan(direction)
 
         checkForPellets();
 
-        pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_LEFT_PP : PACMAN_CLASSIC_LEFT;
-        return SUCCESS;
+        // Might have finished board
+        if (current != -1)
+        {
+          pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_LEFT_PP : PACMAN_CLASSIC_LEFT;
+          return SUCCESS;
+        }
+        else
+        {
+          return FAIL;
+        }
       }
       break;
 
@@ -472,8 +540,16 @@ function resolvePacMan(direction)
 
         checkForPellets();
 
-        pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_DOWN_PP : PACMAN_CLASSIC_DOWN;
-        return SUCCESS;
+        // Might have finished board
+        if (current != -1)
+        {
+          pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_DOWN_PP : PACMAN_CLASSIC_DOWN;
+          return SUCCESS;
+        }
+        else
+        {
+          return FAIL;
+        }
       }
       break;
 
@@ -499,8 +575,16 @@ function resolvePacMan(direction)
 
         checkForPellets();
 
-        pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_UP_PP: PACMAN_CLASSIC_UP;
-        return SUCCESS;
+        // Might have finished board
+        if (current != -1)
+        {
+          pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_UP_PP: PACMAN_CLASSIC_UP;
+          return SUCCESS;
+        }
+        else
+        {
+          return FAIL;
+        }
       }
       break;
 
@@ -517,8 +601,12 @@ function killPacman()
     lives--;
     document.getElementById("livesVariable").innerHTML = lives;
 
-    // launch the respawn timer function
-    setTimeout( respawnPacmanTimer, RESET_PLAYER_DELAY*1000);
+    if (lives > 0)
+      // launch the respawn timer function
+      setTimeout( respawnPacmanTimer, RESET_PLAYER_DELAY*1000);
+    else {
+      window.alert("Game Over");
+    }
 
 }
 
@@ -529,17 +617,17 @@ function killPacman()
 
 function eatGhosts()
 {
-    console.log("Eat ghost called");
+    // console.log("Eat ghost called");
 
   for (var i=0; i<ghosts.length; i++)
   {
     if (ghosts[i].squareNum == current)
     {
-      console.log("Found a ghost to Eat " + i);
+      // console.log("Found a ghost to Eat " + i);
 
       ghosts[i].squareNum = OFF_THE_BOARD;
 
-      console.log("Ghosts squarenum is " + ghosts[i].squareNum);
+      // console.log("Ghosts squarenum is " + ghosts[i].squareNum);
 
       // spawn a new ghost
       reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
@@ -782,7 +870,7 @@ function resolveGhost(ghostId,dir)
 
 function redrawBoardGhost(ghostId, oldSquare)
 {
-    console.log("Ghost " + ghostId + " redraw called for pos " + ghosts[ghostId].squareNum);
+    // console.log("Ghost " + ghostId + " redraw called for pos " + ghosts[ghostId].squareNum);
 
     if (ghosts[ghostId].squareNum != OFF_THE_BOARD)
       {
