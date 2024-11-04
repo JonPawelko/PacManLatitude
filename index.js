@@ -439,7 +439,7 @@ function checkForPellets()
 
     } // end else
 
-    console.log("Total pellets is " + totalPellets + " pellets eaten is " + pelletsEaten + "  power pellets eaten is " + numPowerPelletsEaten + " pp per screen is " + POWER_PELLETS_START_COUNT);
+    // console.log("Total pellets is " + totalPellets + " pellets eaten is " + pelletsEaten + "  power pellets eaten is " + numPowerPelletsEaten + " pp per screen is " + POWER_PELLETS_START_COUNT);
 
     if ((pelletsEaten == totalPellets) && (numPowerPelletsEaten == POWER_PELLETS_START_COUNT))
     {
@@ -639,7 +639,7 @@ function eatGhosts()
 
       ghosts[i].squareNum = OFF_THE_BOARD;
 
-      // console.log("Ghosts squarenum is " + ghosts[i].squareNum);
+      console.log("Ate Ghost " + i + " in squarenum " + current);
 
       // spawn a new ghost
       reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
@@ -739,6 +739,8 @@ function reSpawnGhost(squareNum)
   // push ghost onto array with it's timer id and location
   ghosts.push({squareNum:squareNum, timerID: tempTimerId});
 
+  var temp = new String((ghosts.length)-1);
+  console.log("New ghost num " + temp + " spawned in square " + squareNum);
   // Later redraws are handled by the tick timer function
 
 } // end function spawnGhost
