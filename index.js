@@ -5,29 +5,29 @@ const NUM_ROWS = 8;
 const NUM_COLUMNS = 8;
 const WALL_PCT = .1;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
-const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner
+const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner when pacman spawns or respawns
 const RESET_PLAYER_DELAY = 3; // seconds
 const LIVES_START = 3
 const BOMBS_START_COUNT = 10;
-const POWER_PELLETS_START_COUNT = 3;
+const POWER_PELLETS_START_COUNT = 3;  // num of pp per board
 const POINTS_PER_GHOST = 10;
-const POWER_PELLET_DELAY = 8; // seconds
+const POWER_PELLET_DELAY = 8; // pacman gets this many seconds to kill ghosts after eating pp
 
 var current;    // pacman's current square
-var lives;
-var level;
-var bombs;
+var lives;      // pacman's current # of lives remaining
+var level;      // the board level
+var bombs;      // number of pacmans bombs
 
 // Global variables
 var squares;        // squares on the board
 var score;
 var totalPellets;   // total pellets placed on current board
-var pelletsEaten;   // total pellets eaten on the board
+var pelletsEaten;   // total pellets eaten currently on the board
 var numPowerPellets;  // number of power pellets per board
-var numPowerPelletsEaten;
-var score;
+var numPowerPelletsEaten; // num of pp eaten currently on the board
 var gameMode;         // mode is either "regular" (ghosts kill pacman) or "power pellet" (pacman kills ghosts)
-var myPowerPelletTimerVar;
+
+var myPowerPelletTimerVar;  // used to end pp phase
 
 // General Constants ----------------------------
 
@@ -47,6 +47,7 @@ var UP = 3;
 const FAIL = 0;
 const SUCCESS = 1;
 
+// graphics
 var PACMAN_CLASSIC_RIGHT = "<img src='graphics/Pacman icon right.jpg'>";
 var PACMAN_CLASSIC_LEFT = "<img src='graphics/Pacman icon left.jpg'>";
 var PACMAN_CLASSIC_UP = "<img src='graphics/Pacman icon up.jpg'>";
@@ -68,18 +69,18 @@ const RESOLVE_PACMAN_DEATH = -1;
 const GAME_MODE_POWER_OFF = 0;
 const GAME_MODE_POWER_ON = 1;
 
-const GHOST_FOUND = 1;
 const GHOST_NOT_FOUND = 0;
+const GHOST_FOUND = 1;
 
 const OFF_THE_BOARD = -1;  // square num when dead or off the board
 
 // -------------------------------------------------------------------
 // Initialize global variables
 
-var walls;
-var pellets;
-var powerPellets;
-var ghosts = new Array;
+var walls;  // create the array each time a new board is started
+var pellets;  // create the array each time a new board is started
+var powerPellets;  // create the array each time a new board is started
+var ghosts = new Array;   // use the same ghosts array the whole game
 
 totalPellets = 0;
 pelletsEaten = 0;
@@ -133,7 +134,8 @@ function checkKey(evt)
 {
   var oldCurr = current;
 
-  if (current != OFF_THE_BOARD)   // only intercept keys if pacman on the board
+  // only intercept keys if pacman on the board
+  if (current != OFF_THE_BOARD)
   {
     if (resolvePacMan(evt.keyCode))           // resolvePacMan returns a 1 if success
        redrawBoardPacman(oldCurr, current);    // only redraw board if necessary
@@ -175,10 +177,11 @@ function updateScoreboard()
 
 function buildWallsAndPellets()
 {
-  // deletes old arrays if exist
+  // deletes old arrays if exist by just recreating arrays
   walls = new Array;
   pellets = new Array;
 
+  // iterate through each square
   for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)
   {
       var temp = Math.random();   // random # between 0 and 1
@@ -218,10 +221,15 @@ function createPowerPellets()
   {
     squareFound = false;
 
+    // loop until you find a square with a regular pellet on it, replace it with a PP
     while (squareFound == false)
     {
-      var ppSquare = Math.floor(Math.random() * ((NUM_ROWS*NUM_COLUMNS)-1)) + 1;  // return any square on board except 0.
+      // find a random square between 1 and board size - 1
+      // don't want to put in square 0.  Assume 10x10
+      // floor of Math.random * (boardsize - 2) = 0 to 98, add 1 = 1 to 99 (correct)
+      var ppSquare = Math.floor(Math.random() * ((NUM_ROWS*NUM_COLUMNS)-2)) + 1;  // return any square on board except 0.
 
+      // pellet found, flip to PP
       if (pellets[ppSquare] == 1)
       {
         squareFound = true;
@@ -231,7 +239,7 @@ function createPowerPellets()
       }  // end if
     } // end while
 
-  } // end for`
+  } // end for
 
 }  // end function createPowerPellets
 
@@ -241,9 +249,7 @@ function drawInitialBoard()
 {
   squares = document.querySelectorAll('.square');  // get squares
 
-  // squares[current].innerHTML = PACMAN_CLASSIC_RIGHT;   // set PacMan's current position
-
-  for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)  // loop through walls array, check for wall or pellet
+  for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)  // loop through full board, check for wall or pellet
   {
     // check for wall first
     if (walls[i] == 1)
@@ -257,13 +263,14 @@ function drawInitialBoard()
         {
           squares[i].innerHTML = ICON_PELLET;
         }
-        else {
-                if (powerPellets[i] == 1)
-                {
-                  squares[i].innerHTML = ICON_POWER_PELLET;
-                }
-        }
-    }
+        else  // check for PP
+        {
+          if (powerPellets[i] == 1)
+          {
+            squares[i].innerHTML = ICON_POWER_PELLET;
+          }
+        } // end else
+    } // end else
 
   } // end for loop
 
@@ -274,15 +281,15 @@ function drawInitialBoard()
 
 function resetBoard()
 {
+    current = -1;
     totalPellets = 0;
     pelletsEaten = 0;
     numPowerPelletsEaten = 0;
     numPowerPellets = POWER_PELLETS_START_COUNT;
-
-    current = -1;
     level++;
     gameMode = GAME_MODE_POWER_OFF;
 
+    // turn off PP if on
     if (myPowerPelletTimerVar != -1)
     {
       clearTimeout(myPowerPelletTimerVar);
@@ -297,6 +304,7 @@ function resetBoard()
 
     drawInitialBoard();
 
+    // respawn pacman
     setTimeout( respawnPacmanTimer, RESET_PLAYER_DELAY*1000);
 
 }
@@ -433,7 +441,7 @@ function checkForPellets()
 
     console.log("Total pellets is " + totalPellets + " pellets eaten is " + pelletsEaten + "  power pellets eaten is " + numPowerPelletsEaten + " pp per screen is " + POWER_PELLETS_START_COUNT);
 
-    if ((pelletsEaten == totalPellets) && (numPowerPelletsEaten = POWER_PELLETS_START_COUNT))
+    if ((pelletsEaten == totalPellets) && (numPowerPelletsEaten == POWER_PELLETS_START_COUNT))
     {
       resetBoard();
     }
