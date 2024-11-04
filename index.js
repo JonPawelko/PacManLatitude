@@ -468,6 +468,7 @@ function resolvePacMan(direction)
             if (gameMode == GAME_MODE_POWER_OFF)
             {
                 killPacman();
+                return SUCCESS;
             }
             else
             {
@@ -504,6 +505,7 @@ function resolvePacMan(direction)
           if (gameMode == GAME_MODE_POWER_OFF)
           {
               killPacman();
+              return SUCCESS;
           }
           else
           {
@@ -539,6 +541,7 @@ function resolvePacMan(direction)
           if (gameMode == GAME_MODE_POWER_OFF)
           {
               killPacman();
+              return SUCCESS;
           }
           else
           {
@@ -574,6 +577,7 @@ function resolvePacMan(direction)
           if (gameMode == GAME_MODE_POWER_OFF)
           {
               killPacman();
+              return SUCCESS;
           }
           else
           {
