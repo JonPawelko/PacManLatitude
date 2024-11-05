@@ -28,6 +28,8 @@ var numPowerPelletsEaten; // num of pp eaten currently on the board
 var gameMode;         // mode is either "regular" (ghosts kill pacman) or "power pellet" (pacman kills ghosts)
 
 var myPowerPelletTimerVar;  // used to end pp phase
+var ghostsCreated;
+var ghostsEaten;
 
 // General Constants ----------------------------
 
@@ -86,6 +88,8 @@ totalPellets = 0;
 pelletsEaten = 0;
 numPowerPelletsEaten = 0;
 numPowerPellets = POWER_PELLETS_START_COUNT;
+ghostsEaten = 0;
+ghostsCreated = 0;
 score = 0;
 lives = LIVES_START;
 bombs = BOMBS_START_COUNT;
@@ -181,6 +185,7 @@ function buildWallsAndPellets()
   walls = new Array;
   pellets = new Array;
 
+
   // iterate through each square
   for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)
   {
@@ -247,6 +252,8 @@ function createPowerPellets()
 
 function drawInitialBoard()
 {
+  var foundSomething = 0;
+
   squares = document.querySelectorAll('.square');  // get squares
 
   for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)  // loop through full board, check for wall or pellet
@@ -255,6 +262,7 @@ function drawInitialBoard()
     if (walls[i] == 1)
     {
         squares[i].innerHTML = ICON_WALL;
+        foundSomething = 1;
     }
     else
     {
@@ -262,15 +270,19 @@ function drawInitialBoard()
         if (pellets[i] == 1)
         {
           squares[i].innerHTML = ICON_PELLET;
+          foundSomething = 2;
         }
         else  // check for PP
         {
           if (powerPellets[i] == 1)
           {
             squares[i].innerHTML = ICON_POWER_PELLET;
+            foundSomething = 3;
           }
         } // end else
     } // end else
+
+    // console.log("Found something is " + foundSomething + " in square " + i);
 
   } // end for loop
 
@@ -295,6 +307,8 @@ function resetBoard()
       clearTimeout(myPowerPelletTimerVar);
       myPowerPelletTimerVar = -1;
     }
+
+    resetGhosts();
 
     updateScoreboard();
 
@@ -330,15 +344,18 @@ function spawnPacman()
 
     while (i < walls.length)
     {
-      if (walls[i++] == 0)
+      if ((walls[i] == 0) && (powerPellets[i] == 0))
       {
-        current = i-1;
+        current = i;
         pacmanIcon = PACMAN_CLASSIC_RIGHT;
         squares[current].innerHTML = pacmanIcon;
         checkForPellets();
 
         return;
       }
+      else
+        i++;
+
     } // end while loop
 
 }  // end function spawnPacman
@@ -397,6 +414,7 @@ function redrawBoardPacman(oldSquare, newSquare)
     squares = document.querySelectorAll('.square');
 
     squares[oldSquare].innerHTML = "";   // From square always blank after Pacman leaves
+    // console.log("RedrawBoardPacman blanked cell " + oldSquare);
 
     if (current != OFF_THE_BOARD)
       squares[newSquare].innerHTML = pacmanIcon; // set pac man on new current
@@ -443,6 +461,7 @@ function checkForPellets()
 
     if ((pelletsEaten == totalPellets) && (numPowerPelletsEaten == POWER_PELLETS_START_COUNT))
     {
+      // console.log("Current before reset is " + current);
       resetBoard();
     }
 } // end function checkForPellets
@@ -637,9 +656,9 @@ function eatGhosts()
     {
       // console.log("Found a ghost to Eat " + i);
 
+      ghostsEaten++;
       ghosts[i].squareNum = OFF_THE_BOARD;
-
-      console.log("Ate Ghost " + i + " in squarenum " + current);
+      // console.log("Ate Ghost " + i + " in squarenum " + current + " total ghosts eaten is " + ghostsEaten + "  total ghosts created is " + ghostsCreated + " at " + (new Date()));
 
       // spawn a new ghost
       reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
@@ -697,12 +716,14 @@ function myPowerPelletTimer()
 
 function spawnGhost(squareNum)
 {
+  ghostsCreated++;
+
   // find first empty square starting at the square passed in
   while (walls[squareNum] != 0)
-    squareNum--;
+    squareNum++;
 
   // create timer thread
-  var tempTimerId = setInterval(ghostTick, 3000, ghosts.length);
+  var tempTimerId = setInterval(ghostTick, 2000, ghosts.length);
 
   // push ghost onto array with it's timer id and location
   ghosts.push({squareNum:squareNum, timerID: tempTimerId});
@@ -721,26 +742,34 @@ function reSpawnGhost(squareNum)
 {
   // make sure now spawing directly on pacman or within 1 square
 
+  ghostsCreated++;
   var safeSquareFound = false;
 
   while (safeSquareFound == false)
   {
       if (!((walls[squareNum] == 1) || (current == squareNum) || (current == squareNum+1) || (current == squareNum-1) || (current == squareNum+NUM_COLUMNS) || (current == squareNum-NUM_COLUMNS)))
         safeSquareFound = true;
-      else {
+      else
+      {
         // increase squareNum and try again
         squareNum++;
-      }
-  }
+
+        // if got to the end of the board, try a new random square
+        if (squareNum == NUM_COLUMNS*NUM_ROWS)
+          squareNum = Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS));
+
+      } // end else squarenum too big
+
+  } // end while
 
   // create timer thread
-  var tempTimerId = setInterval(ghostTick, 3000, ghosts.length);
+  var tempTimerId = setInterval(ghostTick, 2000, ghosts.length);
 
   // push ghost onto array with it's timer id and location
   ghosts.push({squareNum:squareNum, timerID: tempTimerId});
 
   var temp = new String((ghosts.length)-1);
-  console.log("New ghost num " + temp + " spawned in square " + squareNum);
+  // console.log("New ghost num " + temp + " spawned in square " + squareNum + "  total ghosts created is " + ghostsCreated + " at " + " at " + (new Date()));
   // Later redraws are handled by the tick timer function
 
 } // end function spawnGhost
@@ -886,27 +915,36 @@ function redrawBoardGhost(ghostId, oldSquare)
 {
     // console.log("Ghost " + ghostId + " redraw called for pos " + ghosts[ghostId].squareNum);
 
-    if (ghosts[ghostId].squareNum != OFF_THE_BOARD)
-      {
-        squares = document.querySelectorAll('.square');
+    squares = document.querySelectorAll('.square');
 
+    if (ghosts[ghostId].squareNum != OFF_THE_BOARD)
         squares[ghosts[ghostId].squareNum].innerHTML = ICON_GHOST;
 
-        // Check what needs to be in old square, for now, only a pellet
-        if (pellets[oldSquare] == 1)
-        {
-            squares[oldSquare].innerHTML = ICON_PELLET;
-        }
-        else  // square is blank
-        {
-          if (powerPellets[oldSquare] == 1)
+    // Check what needs to be in old square, could be anything including a wall - in between screen glitch
+    if (pellets[oldSquare] == 1)
+    {
+        squares[oldSquare].innerHTML = ICON_PELLET;
+    }
+    else  // no pellet
+    {
+      if (powerPellets[oldSquare] == 1)
+      {
+          squares[oldSquare].innerHTML = ICON_POWER_PELLET;
+      }
+      else  // no pp
+      {
+          if (walls[oldSquare] == 1)
           {
-              squares[oldSquare].innerHTML = ICON_POWER_PELLET;
+              squares[oldSquare].innerHTML = ICON_WALL;
+              // console.log("redrawBoardGhost wall scenario in square " + oldSquare);
           }
           else
+          {
             squares[oldSquare].innerHTML = "";
-        }
-    } // end check if ghost is on board
+            // console.log("redrawBoardGhost blanked square " + oldSquare);
+          }
+      }
+    }
 
 }   // end function redrawBoardGhost
 
@@ -927,8 +965,13 @@ function checkForGhost()
  {
       if ((ghosts[ghostId].squareNum == current) && (gameMode == GAME_MODE_POWER_ON))
       {
-        // kill ghost
-        ghosts[ghostId].squareNum = -1;
+        // kill ghost and respawn
+
+        ghosts[ghostId].squareNum = OFF_THE_BOARD;
+
+        // spawn a new ghost
+        reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
+
       }
       else
       {
@@ -968,6 +1011,29 @@ function checkIfGhostInSafetyZone(pos, size)
 } // end function check ghost safety zone
 
 // ----------------------------------------------
+// function resetGhosts - clears out ghosts at end of board and respawns
+//
+function resetGhosts()
+{
+    for (var i=0; i<ghosts.length; i++)
+    {
+      if (ghosts[i].squareNum != -1)
+      {
+        // console.log("Reset Ghost " + i + " in squarenum " + current);
+        ghosts[i].squareNum = OFF_THE_BOARD;
+      } // end if
+
+    }  // end for loop
+
+    // spawn a new ghost for each one on the board
+    reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
+
+    // spawn a new ghost for each one on the board
+    reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
+
+} // end function eatGhosts
+
+// end function resetGhosts -----------------------
 
 // -------------------------------------------------
 // ---------  End Ghost function section ---------
