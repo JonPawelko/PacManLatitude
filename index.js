@@ -1,5 +1,6 @@
 // Release Notes
 //
+// v 1.6 Wed 11-6-24 - Bombs working, fixed bug where pacman dies from a bomb while on PP status
 // v 1.5 Tuesday 11-5-24 - Bombs working. Blows up pacman or a wall if next to bomb
 //
 
@@ -128,7 +129,7 @@ spawnPacman();
 // spawnGhost((NUM_ROWS*NUM_COLUMNS)-1);   // pass in starting sqaure, currently just spawns 1 ghost that does not die
 // spawnGhost(Math.floor(NUM_ROWS*NUM_COLUMNS/2)); // near middle of board
 
-spawnGhost(2);   // pass in starting square
+spawnGhost(3);   // pass in starting square, near upper left for testing purposes
 spawnGhost(12); // near middle of board
 
 // ----------------------------------------------------
@@ -513,10 +514,9 @@ function resolvePacMan(direction)
 
         if (bombCount > 0)
         {
-          console.log("Dropping a bomb in square " + current);
+          // console.log("Dropping a bomb in square " + current);
           bombCount--;
           updateScoreboard();
-          // document.getElementById("bombsVariable").innerHTML = document.getElementById("bombsVariable").innerHTML - 1;
           dropBomb(current);
         }
 
@@ -721,35 +721,40 @@ function eatGhosts()
 
 function myPowerPelletTimer()
 {
-    gameMode = GAME_MODE_POWER_OFF;
-    myPowerPelletTimerVar = -1;
+    // Don't execute timer if Pacman already dead
+    if (current != OFF_THE_BOARD)
+      {
+      gameMode = GAME_MODE_POWER_OFF;
+      myPowerPelletTimerVar = -1;
 
-    switch (pacmanIcon) {
+      switch (pacmanIcon) {
 
-      case PACMAN_CLASSIC_RIGHT_PP:
-          pacmanIcon = PACMAN_CLASSIC_RIGHT;
-          break;
+        case PACMAN_CLASSIC_RIGHT_PP:
+            pacmanIcon = PACMAN_CLASSIC_RIGHT;
+            break;
 
-      case PACMAN_CLASSIC_LEFT_PP:
-          pacmanIcon = PACMAN_CLASSIC_LEFT;
-          break;
+        case PACMAN_CLASSIC_LEFT_PP:
+            pacmanIcon = PACMAN_CLASSIC_LEFT;
+            break;
 
-      case PACMAN_CLASSIC_UP_PP:
-          pacmanIcon = PACMAN_CLASSIC_UP;
-          break;
+        case PACMAN_CLASSIC_UP_PP:
+            pacmanIcon = PACMAN_CLASSIC_UP;
+            break;
 
-      case PACMAN_CLASSIC_DOWN_PP:
-          pacmanIcon = PACMAN_CLASSIC_DOWN;
-          break;
+        case PACMAN_CLASSIC_DOWN_PP:
+            pacmanIcon = PACMAN_CLASSIC_DOWN;
+            break;
 
-      default:
+        default:
 
-    } // end switch
+      } // end switch
 
-    squares = document.querySelectorAll('.square');  // faster to get first?
-    squares[current].innerHTML = pacmanIcon;
+      squares = document.querySelectorAll('.square');  // faster to get first?
+      squares[current].innerHTML = pacmanIcon;
 
-}
+    }   // end if check off the board
+
+}   // end pp timer function
 
 // --------------------------------------------
 // function dropBomb
@@ -763,25 +768,24 @@ function dropBomb(pos)
 
 }
 
-// end function dropBomb
-// --------------------------------------------------------------------------
+// end function dropBomb -----------------------------------------
+
+// -------------------------------------------------------------------
+// Function myBombTimer gets called to blow up a bomb
 
 function myBombTimer(bombIndex)
 {
-    console.log("Bomb timer called for bomb " + bombIndex + " in square " + bombs[bombIndex].squareNum);
+    // console.log("Bomb timer called for bomb " + bombIndex + " in square " + bombs[bombIndex].squareNum);
 
     squares = document.querySelectorAll('.square');  // faster to get first?
 
-    var i;
-
-    // messageBox.innerHTML = "BOMB EXPLODED!"
     var pos = bombs[bombIndex].squareNum;
 
     // check exact cell first for pacman
     if (pos == current)
     {
         // player dies
-        console.log("Bomb found in pacmans square");
+        // console.log("Bomb found in pacmans square");
         squares[current].innerHTML = "";
         killPacman();
     }
@@ -793,18 +797,15 @@ function myBombTimer(bombIndex)
       if ((pos-NUM_COLUMNS) == current)
       {
         squares[current].innerHTML = "";
-        squares[pos].innerHTML = "";
         killPacman();
       }
 
       // check for wall
       if (walls[pos-NUM_COLUMNS] == 1)
       {
-        console.log("Blowing up an Up wall");
+        // console.log("Blowing up an Up wall");
         walls[pos-NUM_COLUMNS] = 0;
         squares[pos-NUM_COLUMNS].innerHTML = "";
-        squares[pos].innerHTML = "";
-        //numberOfWalls--;
       }
     }
 
@@ -813,48 +814,42 @@ function myBombTimer(bombIndex)
     // Don't check if already in bottom row
     if (pos < ((NUM_ROWS-1)*NUM_COLUMNS))
     {
-      console.log("Checking down");
+      // console.log("Checking down");
 
       // check if pacman in
       if ((pos+NUM_COLUMNS) == current)
       {
         squares[current].innerHTML = "";
-        squares[pos].innerHTML = "";
         killPacman();
       }
 
       // check for wall
       if (walls[pos+NUM_COLUMNS] == 1)
       {
-        console.log("Blowing up a Down wall");
+        // console.log("Blowing up a Down wall");
         walls[pos+NUM_COLUMNS] = 0;
         squares[pos+NUM_COLUMNS].innerHTML = "";
-        squares[pos].innerHTML = "";
-        //numberOfWalls--;
       }
     }
 
     // Check left ------------------------------------------
     if (pos % NUM_COLUMNS > 0)
     {
-      console.log("Checking left");
+      // console.log("Checking left");
 
       // check if pacman in
       if ((pos-1) == current)
       {
         squares[current].innerHTML = "";
-        squares[pos].innerHTML = "";
         killPacman();
       }
 
       // check for wall
       if (walls[pos-1] == 1)
       {
-        console.log("Blowing up an Left wall");
+        // console.log("Blowing up an Left wall");
         walls[pos-1] = 0;
         squares[pos-1].innerHTML = "";
-        squares[pos].innerHTML = "";
-        //numberOfWalls--;
       }
     }
 
@@ -865,25 +860,25 @@ function myBombTimer(bombIndex)
       if ((pos+1) == current)
       {
         squares[current].innerHTML = "";
-        squares[pos].innerHTML = "";
         killPacman();
       }
 
       // check for wall
       if (walls[pos+1] == 1)
       {
-        console.log("Blowing up an Right wall");
+        // console.log("Blowing up an Right wall");
         walls[pos+1] = 0;
         squares[pos+1].innerHTML = "";
-        squares[pos].innerHTML = "";
-        //numberOfWalls--;
       }
     }
+
+    // actually blow up bomb, replace with blank square
+    squares[pos].innerHTML = "";
 
     // mark the bomb as off the board (not used anymore)
     bombs[bombIndex].squareNum = OFF_THE_BOARD;
 
-}   // my bomb timer
+}   // end function my bomb timer
 
 //
 // --------------------------------------------
