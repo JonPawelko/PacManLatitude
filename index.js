@@ -1,5 +1,8 @@
 // Release Notes
-//
+// v1.10 11-11-24 - Ghost smarts implemented
+// v1.9 11-9-24 - Tunnel feature
+// v1.8 11-8- Randomized ghost timer
+// v 1.7 Fri - Good bombs working fully
 // v 1.6 Wed 11-6-24 - Bombs working, fixed bug where pacman dies from a bomb while on PP status
 // v 1.5 Tuesday 11-5-24 - Bombs working. Blows up pacman or a wall if next to bomb
 //
@@ -7,36 +10,46 @@
 // Jon's Pacman game ------------------------
 
 // Configurable game components
-const NUM_ROWS = 8;
-const NUM_COLUMNS = 8;
-const WALL_PCT = .1;   // % of walls on board
+const NUM_ROWS = 12;
+const NUM_COLUMNS = 25;
+const WALL_PCT = .2;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
-const SAFE_ZONE_SIZE = 6; // rows/columns of safety in upper left corner when pacman spawns or respawns
+const GHOST_SMARTS = 90; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
+const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner when pacman spawns or respawns
+const GHOST_SPEED = 1;  // how often ghosts move in seconds
 const RESET_PLAYER_DELAY = 3; // seconds
-const LIVES_START = 3
+const LIVES_START = 5
 const BOMBS_START_COUNT = 10;
-const POWER_PELLETS_START_COUNT = 3;  // num of pp per board
+const POWER_PELLETS_START_COUNT = 8;  // num of pp per board
 const POINTS_PER_GHOST = 10;
 const POWER_PELLET_DELAY = 8; // pacman gets this many seconds to kill ghosts after eating pp
 const BOMB_DELAY = 4;   // bombs blow up in this many seconds
+var GOOD_BOMB_DELAY = 10; // how frequently good bombs are dropped
+var GOOD_BOMB_DURATION = 9; // how many seconds a good bomb exists before disappearing
+var TUNNEL1_SQUARE_NUM = 80;
+var TUNNEL2_SQUARE_NUM = 245;
 
+// Global variables
 var current;    // pacman's current square
 var lives;      // pacman's current # of lives remaining
 var level;      // the board level
 var bombCount;  // number of pacmans bombs
 
-// Global variables
-var squares;        // squares on the board
+var squares;        // represents the squares on the board
 var score;
 var totalPellets;   // total pellets placed on current board
 var pelletsEaten;   // total pellets eaten currently on the board
 var numPowerPellets;  // number of power pellets per board
 var numPowerPelletsEaten; // num of pp eaten currently on the board
 var gameMode;         // mode is either "regular" (ghosts kill pacman) or "power pellet" (pacman kills ghosts)
+var tunnel1num;        // tunnel hole in board, exit other tunnel
+var tunnel2num;
 
 var myPowerPelletTimerVar;  // used to end pp phase
 var ghostsCreated;
 var ghostsEaten;
+var goodBombTimerID;
+var cancelGoodBombTimerID;
 
 // General Constants ----------------------------
 
@@ -69,7 +82,9 @@ var ICON_WALL = "<img src='graphics/wallIcon.jpg'>";
 var ICON_GHOST = "<img src='graphics/blueGhost.jpg'>";
 var ICON_PELLET = "<img src='graphics/PelletIcon.jpg'>";
 var ICON_BOMB = "<img src='graphics/BombIcon1.jpg'>";
+var ICON_GOOD_BOMB = "<img src='graphics/GoodBombIcon.jpg'>";
 var ICON_POWER_PELLET = "<img src='graphics/PowerPellet.jpg'>";
+var ICON_TUNNEL = "<img src='graphics/tunnel.jpg'>";
 
 const RESOLVE_PACMAN_FAIL = 0;
 const RESOLVE_PACMAN_SUCCESS = 1;
@@ -90,7 +105,8 @@ var walls;  // create the array each time a new board is started
 var pellets;  // create the array each time a new board is started
 var powerPellets;  // create the array each time a new board is started
 var ghosts = new Array;   // use the same ghosts array the whole game
-var bombs = new Array;    // bombs are similar to ghosts, 1 array position per bomb, not per square
+var bombs = new Array;    // dropped by pacman, bombs are similar to ghosts, 1 array position per bomb, not per square
+var goodBombs = new Array;  // similar structure to pellets
 
 totalPellets = 0;
 pelletsEaten = 0;
@@ -104,6 +120,9 @@ bombCount = BOMBS_START_COUNT;  // how many bombs remaining
 level = 1;
 gameMode = GAME_MODE_POWER_OFF;
 myPowerPelletTimerVar = -1;  // stays -1 if the timer is never used, otherwise stores actual value.  Only need 1.
+goodBombTimerID = -1; // -1 when not in use
+cancelGoodBombTimerID = -1; // -1 when not in use
+
 
 document.onkeydown = checkKey;  // checkKey is function called when key pressed
 var pacmanIcon;   // stores which icon pacman should use based on direction
@@ -120,17 +139,44 @@ updateScoreboard();
 
 buildWallsAndPellets();
 
-createPowerPellets();
+createPowerPelletsAndGoodBombs();
+
+createTunnel();
 
 drawInitialBoard();
+
+startGoodBombTimer();
 
 spawnPacman();
 
 // spawnGhost((NUM_ROWS*NUM_COLUMNS)-1);   // pass in starting sqaure, currently just spawns 1 ghost that does not die
 // spawnGhost(Math.floor(NUM_ROWS*NUM_COLUMNS/2)); // near middle of board
 
-spawnGhost(3);   // pass in starting square, near upper left for testing purposes
-spawnGhost(12); // near middle of board
+spawnGhost(10);   // pass in starting square, near upper left for testing purposes
+// spawnGhost(12); // near middle of board
+// spawnGhost(35); // near middle of board
+// spawnGhost(40); // near middle of board
+// spawnGhost(45); // near middle of board
+// spawnGhost(55); // near middle of board
+// spawnGhost(60); // near middle of board
+// spawnGhost(70); // near middle of board
+// spawnGhost(150); // near middle of board
+// spawnGhost(90); // near middle of board
+// spawnGhost(100); // near middle of board
+// spawnGhost(110); // near middle of board
+// spawnGhost(120); // near middle of board
+// spawnGhost(150); // near middle of board
+// spawnGhost(160); // near middle of board
+// spawnGhost(170); // near middle of board
+// spawnGhost(180); // near middle of board
+// spawnGhost(190); // near middle of board
+// spawnGhost(200); // near middle of board
+// spawnGhost(210); // near middle of board
+// spawnGhost(220); // near middle of board
+
+
+// spawnGhost(60); // near middle of board
+// spawnGhost(70); // near middle of board
 
 // ----------------------------------------------------
 // -----   End Main Driver section  -----------------
@@ -214,11 +260,39 @@ function buildWallsAndPellets()
 
   } // end for loop
 
+  // Check to ensure pacman has a way of escape
+  // if square 0, 1, or the square below pacman is a wall, flip to pellet
+
+  if (walls[0] == 1)
+  {
+    walls[0] = 0;
+    pellets[0] = 1;
+    totalPellets++;
+  }
+
+  if (walls[1] == 1)
+  {
+    walls[1] = 0;
+    pellets[1] = 1;
+    totalPellets++;
+  }
+
+  if (walls[NUM_COLUMNS] == 1)
+  {
+    walls[NUM_COLUMNS] = 0;
+    pellets[NUM_COLUMNS] = 1;
+    totalPellets++;
+  }
+
+  // test walls
+  walls[1] = 1;
+  walls[25] = 1;
+
 } // end function buildWallsAndPellets
 
 // -------------------------------------------------------------------------
 
-function createPowerPellets()
+function createPowerPelletsAndGoodBombs()
 {
   var squareFound = false;
   var i;
@@ -226,10 +300,14 @@ function createPowerPellets()
   // reset pp array if it exists
   powerPellets = new Array;
 
-  // default array to zeros
+  // default both pp and good bombs arrays to zeros
   for (i=0; i< NUM_ROWS*NUM_COLUMNS; i++)
+  {
     powerPellets[i] = 0;
+    goodBombs[i] = 0;     // new code
+  }
 
+  // now create some pp
   for (i=0; i< numPowerPellets; i++)
   {
     squareFound = false;
@@ -258,9 +336,54 @@ function createPowerPellets()
 
 // --------------------------------------------------
 
+function createTunnel()
+{
+  var squareFound = false;
+  var target = TUNNEL1_SQUARE_NUM;
+
+    // loop until you find a square with a regular pellet on it, replace it with tunnel1
+    while (squareFound == false)
+    {
+      // pellet found, use this square as tunnel1
+      if (pellets[target] == 1)
+      {
+        squareFound = true;
+        tunnel1num = target;
+        pellets[target] = 0;
+        totalPellets--;
+      }
+      else {
+        target++;
+      }
+
+    } // end while
+
+    squareFound = false;
+    target = TUNNEL2_SQUARE_NUM;
+
+      // loop until you find a square with a regular pellet on it, replace it with tunnel1
+      while (squareFound == false)
+      {
+        // pellet found, use this square as tunnel1
+        if (pellets[target] == 1)
+        {
+          squareFound = true;
+          tunnel2num = target;
+          pellets[target] = 0;
+          totalPellets--;
+        }
+        else {
+          target++;
+        }
+
+      } // end while
+
+}  // end function createTunnel
+
+// --------------------------------------------------
+
 function drawInitialBoard()
 {
-  var foundSomething = 0;
 
   squares = document.querySelectorAll('.square');  // get squares
 
@@ -270,7 +393,6 @@ function drawInitialBoard()
     if (walls[i] == 1)
     {
         squares[i].innerHTML = ICON_WALL;
-        foundSomething = 1;
     }
     else
     {
@@ -278,14 +400,20 @@ function drawInitialBoard()
         if (pellets[i] == 1)
         {
           squares[i].innerHTML = ICON_PELLET;
-          foundSomething = 2;
         }
         else  // check for PP
         {
           if (powerPellets[i] == 1)
           {
             squares[i].innerHTML = ICON_POWER_PELLET;
-            foundSomething = 3;
+          }
+          else  // check for tunnels
+          {
+              if ((tunnel1num == i) || (tunnel2num == i))
+              {
+                // console.log("Tunnel found at " + i);
+                squares[i].innerHTML = ICON_TUNNEL;
+              }
           }
         } // end else
     } // end else
@@ -322,7 +450,7 @@ function resetBoard()
 
     buildWallsAndPellets();
 
-    createPowerPellets();
+    createPowerPelletsAndGoodBombs();
 
     drawInitialBoard();
 
@@ -346,7 +474,7 @@ function resetBoard()
 function spawnPacman()
 {
     var i = 0;
-    squares = document.querySelectorAll('.square');  // faster to get first?
+    squares = document.querySelectorAll('.square');
 
     // put pacman on first square not a wall
 
@@ -374,8 +502,10 @@ function spawnPacman()
 
 function respawnPacmanTimer()
 {
+  // console.log("Respawn pacman called");
+
   var i; // for loop
-  squares = document.querySelectorAll('.square');  // faster to get first?
+  squares = document.querySelectorAll('.square');
 
   // check each ghost to make sure they are not within the safe zone
   for (i=0;i<ghosts.length;i++)
@@ -422,20 +552,29 @@ function redrawBoardPacman(oldSquare, newSquare)
     var bombFound = false;
     squares = document.querySelectorAll('.square');
 
-    // check bombs array for bomb in oldsquare
-    for (var i=0; i<bombs.length; i++)
+    if ((oldSquare == tunnel1num) || (oldSquare == tunnel2num))
     {
-      if (bombs[i].squareNum == oldSquare)
-      {
-        bombFound = true;
-        squares[oldSquare].innerHTML = ICON_BOMB;
-      }
+      squares[oldSquare].innerHTML = ICON_TUNNEL;
     }
+    else
+    {
+      // check bombs array for bomb in oldsquare
+      for (var i=0; i<bombs.length; i++)
+      {
+        if (bombs[i].squareNum == oldSquare)
+        {
+          bombFound = true;
+          squares[oldSquare].innerHTML = ICON_BOMB;
+        }
+      }
 
-    if (bombFound == false)
-        squares[oldSquare].innerHTML = "";   // From square always blank after Pacman leaves
-    // console.log("RedrawBoardPacman blanked cell " + oldSquare);
+      if (bombFound == false)
+          squares[oldSquare].innerHTML = "";   // From square always blank after Pacman leaves
+      // console.log("RedrawBoardPacman blanked cell " + oldSquare);
 
+    } // finish else - old square handled
+
+    // deal with new square
     if (current != OFF_THE_BOARD)
       squares[newSquare].innerHTML = pacmanIcon; // set pac man on new current
 
@@ -500,7 +639,6 @@ function resolvePacMan(direction)
         if (current == OFF_THE_BOARD)
           return;
 
-        // zzz
         var j=0;
 
         // return immediately if bomb already in square
@@ -512,7 +650,7 @@ function resolvePacMan(direction)
           }
         }
 
-        if (bombCount > 0)
+        if ((bombCount > 0) && (current != tunnel1num) && (current != tunnel2num))
         {
           // console.log("Dropping a bomb in square " + current);
           bombCount--;
@@ -527,6 +665,12 @@ function resolvePacMan(direction)
       if ( (((current + 1) % NUM_COLUMNS) != 0) && (walls[current+1] == 0) )
       {
           current++;
+
+          if (processPacmanTunnel())
+          {
+            pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_RIGHT_PP : PACMAN_CLASSIC_RIGHT;
+            return SUCCESS;
+          }
 
           ghostStatus = checkForGhost();
 
@@ -543,6 +687,7 @@ function resolvePacMan(direction)
             }
           }
 
+          checkForGoodBomb();
           checkForPellets();
 
           // Might have finished board
@@ -565,6 +710,12 @@ function resolvePacMan(direction)
       {
         current--;
 
+        if (processPacmanTunnel())
+        {
+          pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_LEFT_PP : PACMAN_CLASSIC_LEFT;
+          return SUCCESS;
+        }
+
         ghostStatus = checkForGhost();
 
         if (ghostStatus > 0)
@@ -580,6 +731,7 @@ function resolvePacMan(direction)
           }
         }
 
+        checkForGoodBomb();
         checkForPellets();
 
         // Might have finished board
@@ -601,6 +753,12 @@ function resolvePacMan(direction)
       {
         current = current + NUM_COLUMNS;
 
+        if (processPacmanTunnel())
+        {
+            pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_DOWN_PP : PACMAN_CLASSIC_DOWN;
+            return SUCCESS;
+        }
+
         ghostStatus = checkForGhost();
 
         if (ghostStatus > 0)
@@ -616,6 +774,7 @@ function resolvePacMan(direction)
           }
         }
 
+        checkForGoodBomb();
         checkForPellets();
 
         // Might have finished board
@@ -637,6 +796,12 @@ function resolvePacMan(direction)
       {
         current = current - NUM_COLUMNS;
 
+        if (processPacmanTunnel())
+        {
+            pacmanIcon = (gameMode == GAME_MODE_POWER_ON) ? PACMAN_CLASSIC_UP_PP: PACMAN_CLASSIC_UP;
+            return SUCCESS;
+        }
+
         ghostStatus = checkForGhost();
 
         if (ghostStatus > 0)
@@ -652,6 +817,7 @@ function resolvePacMan(direction)
           }
         }
 
+        checkForGoodBomb();
         checkForPellets();
 
         // Might have finished board
@@ -880,6 +1046,117 @@ function myBombTimer(bombIndex)
 
 }   // end function my bomb timer
 
+// -------------------------------------------------
+// Function starts the main good bomb timer.  For ex, drop a bomb every 20 seconds
+
+function startGoodBombTimer()
+{
+    // console.log ("Goodbomb start timer");
+    goodBombTimerID = setInterval(myGoodBombTimer, (1000 * GOOD_BOMB_DELAY));
+
+} // end function startGoodBombTimer
+
+// -----------------------------------------------------------------------
+
+function myGoodBombTimer()
+{
+      // console.log("Bomb Timer 1 called")
+
+      // find a place to drop the good bomob
+      var foundSpot = false;
+
+      while (foundSpot == false)
+      {
+          var targetSpot = Math.floor(Math.random() * NUM_ROWS * NUM_COLUMNS);
+
+          // make sure no pp as well, also no pacman, no tunnels
+          if ((walls[targetSpot] == 0) && (powerPellets[targetSpot] == 0) && (targetSpot != current) && (targetSpot != tunnel1num) && (targetSpot != tunnel2num))
+          {
+            goodBombs[targetSpot] = 1;
+            foundSpot = true;
+          } // end if safe spot for a wall
+      } // end while
+
+      squares = document.querySelectorAll('.square');
+      squares[targetSpot].innerHTML = ICON_GOOD_BOMB;
+
+      cancelGoodBombTimerID = setTimeout(cancelGoodBombTimer, (1000 * GOOD_BOMB_DURATION), targetSpot);
+
+} // end function
+
+// -----------------------------------------------------------------------
+
+function cancelGoodBombTimer(pos)
+{
+  // reset goodBombs array position back to 0
+  goodBombs[pos] = 0;
+
+  squares = document.querySelectorAll('.square');
+
+  // Check if ghost exists on the square first, then pellet
+  var ghostFound = false;
+  var i=0;
+
+  // check if ghost in square
+  while ((i < ghosts.length) && (ghostFound == false))
+  {
+    if (ghosts[i++].squareNum == pos)
+      ghostFound = true;
+  }
+
+  if (ghostFound == true)
+  {
+      squares[pos].innerHTML = ICON_GHOST;
+  }
+  else
+  {
+      // check if pellet belongs on square
+      if (pellets[pos] == 1)
+        squares[pos].innerHTML = ICON_PELLET;
+      else
+        squares[pos].innerHTML = "";
+  }
+
+}  // end function cancelGoodBombTimer
+
+// ---------------------------------------------------
+// function checkForGoodBomb
+
+function checkForGoodBomb()
+{
+
+  if (goodBombs[current] == 1)
+  {
+      bombCount++;
+      updateScoreboard();
+      // score++;
+      goodBombs[current] = 0;
+  }
+
+}  // end function checkForGoodBomb() --------------
+
+// --------------------------------------------------
+// function processPacmanTunnel
+
+function processPacmanTunnel()
+{
+  if (current == tunnel1num)
+  {
+    current = tunnel2num;
+    return SUCCESS;
+  }
+  else
+  {
+      if (current == tunnel2num)
+      {
+        current = tunnel1num;
+        return SUCCESS;
+      }
+  }
+
+  return FAIL;
+
+}
 //
 // --------------------------------------------
 // -----  End Pac Man function section ------
@@ -899,8 +1176,13 @@ function spawnGhost(squareNum)
   while (walls[squareNum] != 0)
     squareNum++;
 
+  // generates a random number between -.4 and +.3
+  var ghostRandomizer = ((Math.floor(Math.random() * 8))-4)/10;
+
   // create timer thread
-  var tempTimerId = setInterval(ghostTick, 2000, ghosts.length);
+  var tempTimerId = setInterval(ghostTick, GHOST_SPEED * 1000 * (1+ghostRandomizer), ghosts.length);
+
+  console.log("Ghost speed created " + GHOST_SPEED * 1000 * (1+ghostRandomizer));
 
   // push ghost onto array with it's timer id and location
   ghosts.push({squareNum:squareNum, timerID: tempTimerId});
@@ -940,7 +1222,7 @@ function reSpawnGhost(squareNum)
   } // end while
 
   // create timer thread
-  var tempTimerId = setInterval(ghostTick, 2000, ghosts.length);
+  var tempTimerId = setInterval(ghostTick, GHOST_SPEED * 1000, ghosts.length);
 
   // push ghost onto array with it's timer id and location
   ghosts.push({squareNum:squareNum, timerID: tempTimerId});
@@ -961,11 +1243,12 @@ function ghostTick(ghostId)
   var tries = 0;
   var dir; // dir 0 = right, 1 = left, 2 = up, 3 = down
 
-
   // loop until a legal move is found or 15 tries
   while ((legalMove == FAIL) && (tries < 15) && (ghosts[ghostId].squareNum != OFF_THE_BOARD))
   {
-    dir = Math.floor(Math.random() * 4);  // returns a random int between 0 and 3
+    dir = calcGhostDirection(ghosts[ghostId].squareNum);
+
+    // dir = Math.floor(Math.random() * 4);  // returns a random int between 0 and 3
 
     // determine if legal move
     legalMove = legalGhostMove(ghostId,dir);
@@ -1061,25 +1344,41 @@ function resolveGhost(ghostId,dir)
       case RIGHT:
 
         ghosts[ghostId].squareNum++;
+
         checkIfOnGhostPacman(ghostId);
+
+        processGhostTunnel(ghostId);
+
         break;
 
       case LEFT:
 
         ghosts[ghostId].squareNum--;
+
         checkIfOnGhostPacman(ghostId);
+
+        processGhostTunnel(ghostId);
+
         break;
 
       case DOWN:
 
         ghosts[ghostId].squareNum += NUM_COLUMNS;
+
         checkIfOnGhostPacman(ghostId);
+
+        processGhostTunnel(ghostId);
+
         break;
 
       case UP:
 
         ghosts[ghostId].squareNum -= NUM_COLUMNS;
+
         checkIfOnGhostPacman(ghostId);
+
+        processGhostTunnel(ghostId);
+
         break;
 
     } // end switch
@@ -1098,32 +1397,275 @@ function redrawBoardGhost(ghostId, oldSquare)
         squares[ghosts[ghostId].squareNum].innerHTML = ICON_GHOST;
 
     // Check what needs to be in old square, could be anything including a wall - in between screen glitch
-    if (pellets[oldSquare] == 1)
+    if (goodBombs[oldSquare] == 1)
     {
-        squares[oldSquare].innerHTML = ICON_PELLET;
+        squares[oldSquare].innerHTML = ICON_GOOD_BOMB;
     }
-    else  // no pellet
+    else
     {
-      if (powerPellets[oldSquare] == 1)
-      {
-          squares[oldSquare].innerHTML = ICON_POWER_PELLET;
-      }
-      else  // no pp
-      {
-          if (walls[oldSquare] == 1)
-          {
-              squares[oldSquare].innerHTML = ICON_WALL;
-              // console.log("redrawBoardGhost wall scenario in square " + oldSquare);
-          }
-          else
-          {
-            squares[oldSquare].innerHTML = "";
-            // console.log("redrawBoardGhost blanked square " + oldSquare);
-          }
-      }
-    }
+        // check for pellet
+        if (pellets[oldSquare] == 1)
+        {
+            squares[oldSquare].innerHTML = ICON_PELLET;
+        }
+        else  // no pellet
+        {
+            if (powerPellets[oldSquare] == 1)
+            {
+                squares[oldSquare].innerHTML = ICON_POWER_PELLET;
+            }
+            else  // no pp
+            {
+                if ((oldSquare == tunnel1num) || (oldSquare == tunnel2num))
+                {
+                    squares[oldSquare].innerHTML = ICON_TUNNEL;
+                }
+                else
+                {
+                    if (walls[oldSquare] == 1)
+                    {
+                        squares[oldSquare].innerHTML = ICON_WALL;
+                    }
+                    else
+                    {
+                        squares[oldSquare].innerHTML = "";
+                    }   // else check for wall
+
+                } // end else tunnel check
+
+            }  // end else check for pp
+
+        } // end else check for pellet
+
+    } // end outer else, check for good bomb
 
 }   // end function redrawBoardGhost
+
+// ------------------------------------------------
+// function calcGhostDirection
+
+function calcGhostDirection(pos)
+{
+  var pacRow = Math.floor(current/NUM_COLUMNS);
+  var pacCol = (current % NUM_COLUMNS);
+  var ghostRow = Math.floor(pos/NUM_COLUMNS);
+  var ghostCol = (pos % NUM_COLUMNS);
+
+  var random = Math.floor(Math.random() * 100) + 1;
+
+  // console.log("Random is " + random + "  Pac row is " + pacRow + "  Pac col is " + pacCol + "  Ghost row is " + ghostRow + "  Ghost col is " + ghostCol);
+
+  // pacman is directly above ghost, ghost should move up
+  if ((pacRow < ghostRow) && (pacCol == ghostCol))
+  {
+      // if random <= GHOST_SMARTS then execute the "right" movement
+      if (random <= GHOST_SMARTS)
+      {
+        // console.log("Returned up");
+
+        // return UP if in regular game mode or DOWN if in PP mode
+        return (gameMode == GAME_MODE_POWER_OFF) ? UP : DOWN;
+      }
+      else // randomly go in 1 of the other 3 directions
+      {
+          // console.log("Returned Not up");
+
+          var random2 = Math.floor(Math.random() * 3);
+
+          if (random2 == 0)
+            return LEFT;
+          else if (random2 == 1)
+            return RIGHT;
+          else
+            // return opposite of "right" movement
+            return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : UP;
+      }   // end else
+
+  } // end up UP scenario
+
+  // pacman is below above ghost, ghost should move down
+  if ((pacRow > ghostRow) && (pacCol == ghostCol))
+  {
+    if (random <= GHOST_SMARTS)
+    {
+      // console.log("Returned down");
+      return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : UP;
+    }
+    else // randomly go in 1 of the other 3 directions
+    {
+        // console.log("Returned not down");
+
+        var random2 = Math.floor(Math.random() * 3);
+
+        if (random2 == 0)
+          return LEFT;
+        else if (random2 == 1)
+          return RIGHT;
+        else
+          return (gameMode == GAME_MODE_POWER_OFF) ? UP : DOWN;
+    }   // end else
+
+  }
+
+  // pacman is directly left of ghost
+  if ((pacRow == ghostRow) && (pacCol < ghostCol))
+  {
+    if (random <= GHOST_SMARTS)
+    {
+      // console.log("Returned left");
+      return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : RIGHT;
+    }
+    else // randomly go in 1 of the other 3 directions
+    {
+        // console.log("Returned not left");
+
+        var random2 = Math.floor(Math.random() * 3);
+
+        if (random2 == 0)
+          return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : LEFT;
+        else if (random2 == 1)
+          return UP;
+        else
+          return DOWN;
+    }   // end else
+
+  }
+
+  // pacman is directly right of ghost
+  if ((pacRow == ghostRow) && (pacCol > ghostCol))
+  {
+    if (random <= GHOST_SMARTS)
+    {
+      // console.log("Returned right");
+      return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : LEFT;
+    }
+    else // randomly go in 1 of the other 3 directions
+    {
+        // console.log("Returned not right");
+        var random2 = Math.floor(Math.random() * 3);
+
+        if (random2 == 0)
+          return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : RIGHT;
+        else if (random2 == 1)
+          return UP;
+        else
+          return DOWN;
+    }   // end else
+
+  }
+
+  // pacman is north west - up, left
+  if ((pacRow < ghostRow) && (pacCol < ghostCol))
+  {
+    // console.log("Returned up or left");
+
+    if (random <= GHOST_SMARTS)
+    {
+      var random2 = Math.floor(Math.random() * 2);
+
+      if (random2 == 0)
+        return (gameMode == GAME_MODE_POWER_OFF) ? UP : DOWN;
+      else
+        return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : RIGHT;
+    }
+    else // randomly go in 1 of the other 2 directions
+    {
+        // console.log("Returned not up or left");
+        var random2 = Math.floor(Math.random() * 2);
+
+        if (random2 == 0)
+          return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : LEFT;
+        else
+          return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : UP;
+    }   // end else
+
+  }
+
+  // pacman is north east - up, right
+  if ((pacRow < ghostRow) && (pacCol > ghostCol))
+  {
+    // console.log("Returned up or right");
+
+    if (random <= GHOST_SMARTS)
+    {
+      var random2 = Math.floor(Math.random() * 2);
+
+      if (random2 == 0)
+        return (gameMode == GAME_MODE_POWER_OFF) ? UP : DOWN;
+      else
+        return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : LEFT;
+    }
+    else // randomly go in 1 of the other 2 directions
+    {
+        // console.log("Returned not up or right");
+
+        var random2 = Math.floor(Math.random() * 2);
+
+        if (random2 == 0)
+          return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : RIGHT;
+        else
+          return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : UP;
+    }   // end else
+
+  }
+
+  // pacman is south west
+  if ((pacRow > ghostRow) && (pacCol < ghostCol))
+  {
+    // console.log("Returned down or left");
+
+    if (random <= GHOST_SMARTS)
+    {
+      var random2 = Math.floor(Math.random() * 2);
+
+      if (random2 == 0)
+        return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : UP;
+      else
+        return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : RIGHT;
+    }
+    else // randomly go in 1 of the other 2 directions
+    {
+        // console.log("Returned not down or left");
+
+        var random2 = Math.floor(Math.random() * 2);
+
+        if (random2 == 0)
+          return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : LEFT;
+        else
+          return (gameMode == GAME_MODE_POWER_OFF) ? UP : RIGHT;
+    }   // end else
+
+  }
+  else // else pacman is south east
+  {
+    if (random <= GHOST_SMARTS)
+    {
+      // console.log("Returned down or right");
+
+      var random2 = Math.floor(Math.random() * 2);
+
+      if (random2 == 0)
+        return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : UP;
+      else
+        return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : LEFT;
+    }
+    else // randomly go in 1 of the other 2 directions
+    {
+        // console.log("Returned not down or right");
+
+        var random2 = Math.floor(Math.random() * 2);
+
+        if (random2 == 0)
+          return (gameMode == GAME_MODE_POWER_OFF) ? UP : DOWN;
+        else
+          return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : RIGHT;
+    }   // end else
+
+  }
+
+} // end function calcGhostDirection
+
+// -----------------------------------------------
 
 // ------------------------------------------------
 
@@ -1211,6 +1753,29 @@ function resetGhosts()
 } // end function eatGhosts
 
 // end function resetGhosts -----------------------
+//
+// function processGhostTunnel
+//
+function processGhostTunnel(ghostId)
+{
+  squares = document.querySelectorAll('.square');  // get squares
+
+  if (ghosts[ghostId].squareNum == tunnel1num)
+  {
+    // need to redraw tunnel square
+    squares[tunnel1num].innerHTML = ICON_TUNNEL;
+    ghosts[ghostId].squareNum = tunnel2num;
+  }
+  else
+  {
+      if (ghosts[ghostId].squareNum == tunnel2num)
+      {
+        squares[tunnel2num].innerHTML = ICON_TUNNEL;
+        ghosts[ghostId].squareNum = tunnel1num;
+      }
+  } // end else
+
+}  // end function processGhostTunnel ---------------
 
 // -------------------------------------------------
 // ---------  End Ghost function section ---------
