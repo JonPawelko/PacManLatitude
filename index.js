@@ -1,18 +1,18 @@
 // Release Notes
+// v1.11 11-12-24 - Rabid ghost type added, runs towards pacman when pacman in PP mode
 // v1.10 11-11-24 - Ghost smarts implemented
 // v1.9 11-9-24 - Tunnel feature
 // v1.8 11-8- Randomized ghost timer
 // v 1.7 Fri - Good bombs working fully
 // v 1.6 Wed 11-6-24 - Bombs working, fixed bug where pacman dies from a bomb while on PP status
 // v 1.5 Tuesday 11-5-24 - Bombs working. Blows up pacman or a wall if next to bomb
-//
 
 // Jon's Pacman game ------------------------
 
 // Configurable game components
-const NUM_ROWS = 12;
-const NUM_COLUMNS = 25;
-const WALL_PCT = .2;   // % of walls on board
+const NUM_ROWS = 10;
+const NUM_COLUMNS = 10;
+const WALL_PCT = .1;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
 const GHOST_SMARTS = 90; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
 const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner when pacman spawns or respawns
@@ -24,10 +24,13 @@ const POWER_PELLETS_START_COUNT = 8;  // num of pp per board
 const POINTS_PER_GHOST = 10;
 const POWER_PELLET_DELAY = 8; // pacman gets this many seconds to kill ghosts after eating pp
 const BOMB_DELAY = 4;   // bombs blow up in this many seconds
-var GOOD_BOMB_DELAY = 10; // how frequently good bombs are dropped
-var GOOD_BOMB_DURATION = 9; // how many seconds a good bomb exists before disappearing
-var TUNNEL1_SQUARE_NUM = 80;
-var TUNNEL2_SQUARE_NUM = 245;
+const GOOD_BOMB_DELAY = 10; // how frequently good bombs are dropped
+const GOOD_BOMB_DURATION = 9; // how many seconds a good bomb exists before disappearing
+const TUNNEL1_SQUARE_NUM = 23;
+const TUNNEL2_SQUARE_NUM = 77;
+
+const GHOST_TYPE_NORMAL = 0;
+const GHOST_TYPE_RABID = 1;
 
 // Global variables
 var current;    // pacman's current square
@@ -85,6 +88,7 @@ var ICON_BOMB = "<img src='graphics/BombIcon1.jpg'>";
 var ICON_GOOD_BOMB = "<img src='graphics/GoodBombIcon.jpg'>";
 var ICON_POWER_PELLET = "<img src='graphics/PowerPellet.jpg'>";
 var ICON_TUNNEL = "<img src='graphics/tunnel.jpg'>";
+var ICON_GHOST_RABID = "<img src='graphics/rabidGhost.jpg'>"
 
 const RESOLVE_PACMAN_FAIL = 0;
 const RESOLVE_PACMAN_SUCCESS = 1;
@@ -152,7 +156,7 @@ spawnPacman();
 // spawnGhost((NUM_ROWS*NUM_COLUMNS)-1);   // pass in starting sqaure, currently just spawns 1 ghost that does not die
 // spawnGhost(Math.floor(NUM_ROWS*NUM_COLUMNS/2)); // near middle of board
 
-spawnGhost(10);   // pass in starting square, near upper left for testing purposes
+spawnGhost(15);   // pass in starting square, near upper left for testing purposes
 // spawnGhost(12); // near middle of board
 // spawnGhost(35); // near middle of board
 // spawnGhost(40); // near middle of board
@@ -285,8 +289,8 @@ function buildWallsAndPellets()
   }
 
   // test walls
-  walls[1] = 1;
-  walls[25] = 1;
+  // walls[1] = 1;
+  // walls[25] = 1;
 
 } // end function buildWallsAndPellets
 
@@ -451,6 +455,8 @@ function resetBoard()
     buildWallsAndPellets();
 
     createPowerPelletsAndGoodBombs();
+
+    createTunnel();
 
     drawInitialBoard();
 
@@ -872,7 +878,7 @@ function eatGhosts()
 
       ghostsEaten++;
       ghosts[i].squareNum = OFF_THE_BOARD;
-      // console.log("Ate Ghost " + i + " in squarenum " + current + " total ghosts eaten is " + ghostsEaten + "  total ghosts created is " + ghostsCreated + " at " + (new Date()));
+      console.log("Ate Ghost " + i + " in squarenum " + current + " total ghosts eaten is " + ghostsEaten + "  total ghosts created is " + ghostsCreated + " at " + (new Date()));
 
       // spawn a new ghost
       reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
@@ -1060,6 +1066,9 @@ function startGoodBombTimer()
 
 function myGoodBombTimer()
 {
+    var i = 0;
+    var bombFound = false;
+
       // console.log("Bomb Timer 1 called")
 
       // find a place to drop the good bomob
@@ -1072,8 +1081,21 @@ function myGoodBombTimer()
           // make sure no pp as well, also no pacman, no tunnels
           if ((walls[targetSpot] == 0) && (powerPellets[targetSpot] == 0) && (targetSpot != current) && (targetSpot != tunnel1num) && (targetSpot != tunnel2num))
           {
-            goodBombs[targetSpot] = 1;
-            foundSpot = true;
+            // space clear so far, now check for any bombs
+
+            // zzz
+            while ((i < bombs.length) && (bombFound == false))
+            {
+              if (bombs[i++].squareNum == targetSpot)
+                bombFound = true;
+            }
+
+            if (bombFound == false)
+            {
+              goodBombs[targetSpot] = 1;
+              foundSpot = true;
+            }
+
           } // end if safe spot for a wall
       } // end while
 
@@ -1106,7 +1128,7 @@ function cancelGoodBombTimer(pos)
 
   if (ghostFound == true)
   {
-      squares[pos].innerHTML = ICON_GHOST;
+      squares[pos].innerHTML = (ghosts[i-1].ghost_type == GHOST_TYPE_NORMAL) ? ICON_GHOST : ICON_GHOST_RABID;
   }
   else
   {
@@ -1185,13 +1207,14 @@ function spawnGhost(squareNum)
   console.log("Ghost speed created " + GHOST_SPEED * 1000 * (1+ghostRandomizer));
 
   // push ghost onto array with it's timer id and location
-  ghosts.push({squareNum:squareNum, timerID: tempTimerId});
+  ghosts.push({squareNum:squareNum, ghost_type: GHOST_TYPE_RABID, timerID: tempTimerId});
 
   // console.log(ghosts);
 
   // Draw ghost on board.  Later redraws are handled by the tick timer function
   squares = document.querySelectorAll('.square');  // faster to get first?
-  squares[squareNum].innerHTML = ICON_GHOST;
+
+  squares[squareNum].innerHTML = (ghosts[ghosts.length-1].ghost_type == GHOST_TYPE_NORMAL) ? ICON_GHOST : ICON_GHOST_RABID;
 
 } // end function spawnGhost
 
@@ -1224,11 +1247,14 @@ function reSpawnGhost(squareNum)
   // create timer thread
   var tempTimerId = setInterval(ghostTick, GHOST_SPEED * 1000, ghosts.length);
 
+  var ghostType = (Math.floor(Math.random()*2) == 0) ? GHOST_TYPE_NORMAL : GHOST_TYPE_RABID;
+
   // push ghost onto array with it's timer id and location
-  ghosts.push({squareNum:squareNum, timerID: tempTimerId});
+  ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId});
 
   var temp = new String((ghosts.length)-1);
-  // console.log("New ghost num " + temp + " spawned in square " + squareNum + "  total ghosts created is " + ghostsCreated + " at " + " at " + (new Date()));
+
+  console.log("New ghost num " + temp + " of type " + ghostType + " spawned in square " + squareNum + "  total ghosts created is " + ghostsCreated + " at " + " at " + (new Date()));
   // Later redraws are handled by the tick timer function
 
 } // end function spawnGhost
@@ -1246,7 +1272,7 @@ function ghostTick(ghostId)
   // loop until a legal move is found or 15 tries
   while ((legalMove == FAIL) && (tries < 15) && (ghosts[ghostId].squareNum != OFF_THE_BOARD))
   {
-    dir = calcGhostDirection(ghosts[ghostId].squareNum);
+    dir = calcGhostDirection(ghosts[ghostId].ghost_type, ghosts[ghostId].squareNum);
 
     // dir = Math.floor(Math.random() * 4);  // returns a random int between 0 and 3
 
@@ -1391,60 +1417,85 @@ function redrawBoardGhost(ghostId, oldSquare)
 {
     // console.log("Ghost " + ghostId + " redraw called for pos " + ghosts[ghostId].squareNum);
 
+    var bombFound = false;
+
     squares = document.querySelectorAll('.square');
 
     if (ghosts[ghostId].squareNum != OFF_THE_BOARD)
-        squares[ghosts[ghostId].squareNum].innerHTML = ICON_GHOST;
-
-    // Check what needs to be in old square, could be anything including a wall - in between screen glitch
-    if (goodBombs[oldSquare] == 1)
     {
-        squares[oldSquare].innerHTML = ICON_GOOD_BOMB;
+        squares[ghosts[ghostId].squareNum].innerHTML = (ghosts[ghostId].ghost_type == GHOST_TYPE_NORMAL) ? ICON_GHOST : ICON_GHOST_RABID;
     }
-    else
+    // Check what needs to be in old square, could be anything including a wall - in between screen glitch
+
+    // Check for a bomb, hightest priority, then check rest
+
+    // check bombs array for bomb in oldsquare
+    var i = 0;
+
+    while ((i < bombs.length) && (bombFound == false))
     {
-        // check for pellet
-        if (pellets[oldSquare] == 1)
-        {
-            squares[oldSquare].innerHTML = ICON_PELLET;
-        }
-        else  // no pellet
-        {
-            if (powerPellets[oldSquare] == 1)
-            {
-                squares[oldSquare].innerHTML = ICON_POWER_PELLET;
-            }
-            else  // no pp
-            {
-                if ((oldSquare == tunnel1num) || (oldSquare == tunnel2num))
-                {
-                    squares[oldSquare].innerHTML = ICON_TUNNEL;
-                }
-                else
-                {
-                    if (walls[oldSquare] == 1)
-                    {
-                        squares[oldSquare].innerHTML = ICON_WALL;
-                    }
-                    else
-                    {
-                        squares[oldSquare].innerHTML = "";
-                    }   // else check for wall
+      if (bombs[i++].squareNum == oldSquare)
+      {
+        bombFound = true;
+        squares[oldSquare].innerHTML = ICON_BOMB;
+      }
+    }
 
-                } // end else tunnel check
+    // no bomb, keep checking
+    if (bombFound == false)
+    {
+      if (goodBombs[oldSquare] == 1)
+      {
+          squares[oldSquare].innerHTML = ICON_GOOD_BOMB;
+      }
+      else
+      {
+          // check for pellet
+          if (pellets[oldSquare] == 1)
+          {
+              squares[oldSquare].innerHTML = ICON_PELLET;
+          }
+          else  // no pellet
+          {
+              if (powerPellets[oldSquare] == 1)
+              {
+                  squares[oldSquare].innerHTML = ICON_POWER_PELLET;
+              }
+              else  // no pp
+              {
+                  if ((oldSquare == tunnel1num) || (oldSquare == tunnel2num))
+                  {
+                      squares[oldSquare].innerHTML = ICON_TUNNEL;
+                  }
+                  else
+                  {
 
-            }  // end else check for pp
+                      if (walls[oldSquare] == 1)
+                      {
+                          squares[oldSquare].innerHTML = ICON_WALL;
+                      }
+                      else
+                      {
+                          squares[oldSquare].innerHTML = "";
+                      }   // else check for wall
 
-        } // end else check for pellet
 
-    } // end outer else, check for good bomb
+                  } // end else tunnel check
+
+              }  // end else check for pp
+
+          } // end else check for pellet
+
+      } // end outer else, check for good bomb
+
+    } // end check for bomb
 
 }   // end function redrawBoardGhost
 
 // ------------------------------------------------
 // function calcGhostDirection
 
-function calcGhostDirection(pos)
+function calcGhostDirection(type, pos)
 {
   var pacRow = Math.floor(current/NUM_COLUMNS);
   var pacCol = (current % NUM_COLUMNS);
@@ -1455,7 +1506,7 @@ function calcGhostDirection(pos)
 
   // console.log("Random is " + random + "  Pac row is " + pacRow + "  Pac col is " + pacCol + "  Ghost row is " + ghostRow + "  Ghost col is " + ghostCol);
 
-  // pacman is directly above ghost, ghost should move up
+  // #1 - pacman is directly above ghost, ghost should move up
   if ((pacRow < ghostRow) && (pacCol == ghostCol))
   {
       // if random <= GHOST_SMARTS then execute the "right" movement
@@ -1464,7 +1515,7 @@ function calcGhostDirection(pos)
         // console.log("Returned up");
 
         // return UP if in regular game mode or DOWN if in PP mode
-        return (gameMode == GAME_MODE_POWER_OFF) ? UP : DOWN;
+        return (gameMode == GAME_MODE_POWER_OFF) ? UP : (type != GHOST_TYPE_RABID) ? DOWN : UP;
       }
       else // randomly go in 1 of the other 3 directions
       {
@@ -1483,13 +1534,13 @@ function calcGhostDirection(pos)
 
   } // end up UP scenario
 
-  // pacman is below above ghost, ghost should move down
+  // #2 - pacman is below above ghost, ghost should move down
   if ((pacRow > ghostRow) && (pacCol == ghostCol))
   {
     if (random <= GHOST_SMARTS)
     {
       // console.log("Returned down");
-      return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : UP;
+      return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : (type != GHOST_TYPE_RABID) ? UP : DOWN;
     }
     else // randomly go in 1 of the other 3 directions
     {
@@ -1507,13 +1558,13 @@ function calcGhostDirection(pos)
 
   }
 
-  // pacman is directly left of ghost
+  // #3 - pacman is directly left of ghost
   if ((pacRow == ghostRow) && (pacCol < ghostCol))
   {
     if (random <= GHOST_SMARTS)
     {
       // console.log("Returned left");
-      return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : RIGHT;
+      return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : (type != GHOST_TYPE_RABID) ? RIGHT : LEFT;
     }
     else // randomly go in 1 of the other 3 directions
     {
@@ -1531,13 +1582,13 @@ function calcGhostDirection(pos)
 
   }
 
-  // pacman is directly right of ghost
+  // #4 - pacman is directly right of ghost
   if ((pacRow == ghostRow) && (pacCol > ghostCol))
   {
     if (random <= GHOST_SMARTS)
     {
       // console.log("Returned right");
-      return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : LEFT;
+      return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : (type != GHOST_TYPE_RABID) ? LEFT : RIGHT;
     }
     else // randomly go in 1 of the other 3 directions
     {
@@ -1554,7 +1605,7 @@ function calcGhostDirection(pos)
 
   }
 
-  // pacman is north west - up, left
+  // #5 - pacman is north west - up, left
   if ((pacRow < ghostRow) && (pacCol < ghostCol))
   {
     // console.log("Returned up or left");
@@ -1564,9 +1615,9 @@ function calcGhostDirection(pos)
       var random2 = Math.floor(Math.random() * 2);
 
       if (random2 == 0)
-        return (gameMode == GAME_MODE_POWER_OFF) ? UP : DOWN;
+        return (gameMode == GAME_MODE_POWER_OFF) ? UP : (type != GHOST_TYPE_RABID) ? DOWN : UP;
       else
-        return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : RIGHT;
+        return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : (type != GHOST_TYPE_RABID) ? RIGHT : LEFT;
     }
     else // randomly go in 1 of the other 2 directions
     {
@@ -1581,7 +1632,7 @@ function calcGhostDirection(pos)
 
   }
 
-  // pacman is north east - up, right
+  // #6 - pacman is north east - up, right
   if ((pacRow < ghostRow) && (pacCol > ghostCol))
   {
     // console.log("Returned up or right");
@@ -1591,9 +1642,9 @@ function calcGhostDirection(pos)
       var random2 = Math.floor(Math.random() * 2);
 
       if (random2 == 0)
-        return (gameMode == GAME_MODE_POWER_OFF) ? UP : DOWN;
+        return (gameMode == GAME_MODE_POWER_OFF) ? UP : (type != GHOST_TYPE_RABID) ? DOWN : UP;
       else
-        return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : LEFT;
+        return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : (type != GHOST_TYPE_RABID) ? LEFT : RIGHT;
     }
     else // randomly go in 1 of the other 2 directions
     {
@@ -1609,7 +1660,7 @@ function calcGhostDirection(pos)
 
   }
 
-  // pacman is south west
+  // #7 - pacman is south west
   if ((pacRow > ghostRow) && (pacCol < ghostCol))
   {
     // console.log("Returned down or left");
@@ -1619,9 +1670,9 @@ function calcGhostDirection(pos)
       var random2 = Math.floor(Math.random() * 2);
 
       if (random2 == 0)
-        return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : UP;
+        return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : (type != GHOST_TYPE_RABID) ? UP : DOWN;
       else
-        return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : RIGHT;
+        return (gameMode == GAME_MODE_POWER_OFF) ? LEFT : (type != GHOST_TYPE_RABID) ? RIGHT : LEFT;
     }
     else // randomly go in 1 of the other 2 directions
     {
@@ -1636,7 +1687,7 @@ function calcGhostDirection(pos)
     }   // end else
 
   }
-  else // else pacman is south east
+  else // else #8 - pacman is south east
   {
     if (random <= GHOST_SMARTS)
     {
@@ -1645,9 +1696,9 @@ function calcGhostDirection(pos)
       var random2 = Math.floor(Math.random() * 2);
 
       if (random2 == 0)
-        return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : UP;
+        return (gameMode == GAME_MODE_POWER_OFF) ? DOWN : (type != GHOST_TYPE_RABID) ? UP : DOWN;
       else
-        return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : LEFT;
+        return (gameMode == GAME_MODE_POWER_OFF) ? RIGHT : (type != GHOST_TYPE_RABID) ? LEFT : RIGHT;
     }
     else // randomly go in 1 of the other 2 directions
     {
