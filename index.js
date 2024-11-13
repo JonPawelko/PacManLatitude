@@ -1,4 +1,5 @@
 // Release Notes
+// v1.12 11-13=24 - Updated ghost spawning logic, now configurable
 // v1.11 11-12-24 - Rabid ghost type added, runs towards pacman when pacman in PP mode
 // v1.10 11-11-24 - Ghost smarts implemented
 // v1.9 11-9-24 - Tunnel feature
@@ -14,6 +15,7 @@ const NUM_ROWS = 10;
 const NUM_COLUMNS = 10;
 const WALL_PCT = .1;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
+const NUM_GHOSTS = 5;   // number of ghosts to create on each level
 const GHOST_SMARTS = 90; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
 const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner when pacman spawns or respawns
 const GHOST_SPEED = 1;  // how often ghosts move in seconds
@@ -127,7 +129,6 @@ myPowerPelletTimerVar = -1;  // stays -1 if the timer is never used, otherwise s
 goodBombTimerID = -1; // -1 when not in use
 cancelGoodBombTimerID = -1; // -1 when not in use
 
-
 document.onkeydown = checkKey;  // checkKey is function called when key pressed
 var pacmanIcon;   // stores which icon pacman should use based on direction
 
@@ -136,51 +137,25 @@ var pacmanIcon;   // stores which icon pacman should use based on direction
 // ----------------------------------------------------
 
 // Initialize game components
-
+console.log("Got hereerereer1");
 createBoard();
-
+console.log("Got hereerereer2");
 updateScoreboard();
-
+console.log("Got hereerereer3");
 buildWallsAndPellets();
-
+console.log("Got hereerereer4");
 createPowerPelletsAndGoodBombs();
-
+console.log("Got hereerereer5");
 createTunnel();
-
+console.log("Got hereerereer6");
 drawInitialBoard();
-
+console.log("Got hereerereer7");
 startGoodBombTimer();
+console.log("got here")
+spawnAllGhosts();
 
-spawnPacman();
+respawnPacmanTimer();
 
-// spawnGhost((NUM_ROWS*NUM_COLUMNS)-1);   // pass in starting sqaure, currently just spawns 1 ghost that does not die
-// spawnGhost(Math.floor(NUM_ROWS*NUM_COLUMNS/2)); // near middle of board
-
-spawnGhost(15);   // pass in starting square, near upper left for testing purposes
-// spawnGhost(12); // near middle of board
-// spawnGhost(35); // near middle of board
-// spawnGhost(40); // near middle of board
-// spawnGhost(45); // near middle of board
-// spawnGhost(55); // near middle of board
-// spawnGhost(60); // near middle of board
-// spawnGhost(70); // near middle of board
-// spawnGhost(150); // near middle of board
-// spawnGhost(90); // near middle of board
-// spawnGhost(100); // near middle of board
-// spawnGhost(110); // near middle of board
-// spawnGhost(120); // near middle of board
-// spawnGhost(150); // near middle of board
-// spawnGhost(160); // near middle of board
-// spawnGhost(170); // near middle of board
-// spawnGhost(180); // near middle of board
-// spawnGhost(190); // near middle of board
-// spawnGhost(200); // near middle of board
-// spawnGhost(210); // near middle of board
-// spawnGhost(220); // near middle of board
-
-
-// spawnGhost(60); // near middle of board
-// spawnGhost(70); // near middle of board
 
 // ----------------------------------------------------
 // -----   End Main Driver section  -----------------
@@ -448,7 +423,7 @@ function resetBoard()
       myPowerPelletTimerVar = -1;
     }
 
-    resetGhosts();
+    // resetGhosts();
 
     updateScoreboard();
 
@@ -459,6 +434,8 @@ function resetBoard()
     createTunnel();
 
     drawInitialBoard();
+
+    spawnAllGhosts();
 
     // respawn pacman
     setTimeout( respawnPacmanTimer, RESET_PLAYER_DELAY*1000);
@@ -881,7 +858,7 @@ function eatGhosts()
       console.log("Ate Ghost " + i + " in squarenum " + current + " total ghosts eaten is " + ghostsEaten + "  total ghosts created is " + ghostsCreated + " at " + (new Date()));
 
       // spawn a new ghost
-      reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
+      reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)), ghosts[i].ghost_type);  // return any square on board
 
     }
 
@@ -1083,7 +1060,6 @@ function myGoodBombTimer()
           {
             // space clear so far, now check for any bombs
 
-            // zzz
             while ((i < bombs.length) && (bombFound == false))
             {
               if (bombs[i++].squareNum == targetSpot)
@@ -1185,13 +1161,36 @@ function processPacmanTunnel()
 // --------------------------------------------
 
 // ************************************************************************
-
+// ggg
 // -------------------------------------------------
 // ---------  Start Ghost function section ---------
 // -------------------------------------------------
 
+function spawnAllGhosts()
+{
+    console.log("Got hereerereer, numghosts is " + NUM_GHOSTS);
+
+    // zzz
+    // return;
+
+    // reset ghost array after each level
+    ghosts = new Array;
+
+    for (var i=0; i<NUM_GHOSTS; i++)
+    {
+        spawnGhost(Math.floor(Math.random() * NUM_ROWS*NUM_COLUMNS));
+    }
+
+}  // end function spawnAllGhosts
+
+// ---------------------------------------------------
+// spawn a single ghost in a square or near it
+
 function spawnGhost(squareNum)
 {
+  console.log("Got into spawn ghost square num passed in is " + squareNum );
+  // return;
+  // zzz
   ghostsCreated++;
 
   // find first empty square starting at the square passed in
@@ -1206,8 +1205,12 @@ function spawnGhost(squareNum)
 
   console.log("Ghost speed created " + GHOST_SPEED * 1000 * (1+ghostRandomizer));
 
+  // randomly determine which type of ghost
+
+  var tempGhostType = (Math.floor(Math.random() * 2));
+
   // push ghost onto array with it's timer id and location
-  ghosts.push({squareNum:squareNum, ghost_type: GHOST_TYPE_RABID, timerID: tempTimerId});
+  ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId});
 
   // console.log(ghosts);
 
@@ -1220,7 +1223,7 @@ function spawnGhost(squareNum)
 
 // ---------------------------------------------------------------------
 
-function reSpawnGhost(squareNum)
+function reSpawnGhost(squareNum, ghostType)
 {
   // make sure now spawing directly on pacman or within 1 square
 
@@ -1247,9 +1250,7 @@ function reSpawnGhost(squareNum)
   // create timer thread
   var tempTimerId = setInterval(ghostTick, GHOST_SPEED * 1000, ghosts.length);
 
-  var ghostType = (Math.floor(Math.random()*2) == 0) ? GHOST_TYPE_NORMAL : GHOST_TYPE_RABID;
-
-  // push ghost onto array with it's timer id and location
+  // push ghost onto array with it's location, type, and timer id
   ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId});
 
   var temp = new String((ghosts.length)-1);
@@ -1740,7 +1741,7 @@ function checkForGhost()
         ghosts[ghostId].squareNum = OFF_THE_BOARD;
 
         // spawn a new ghost
-        reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
+        reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)), ghosts[ghostId].ghost_type);  // return any square on board
 
       }
       else
@@ -1783,6 +1784,8 @@ function checkIfGhostInSafetyZone(pos, size)
 // ----------------------------------------------
 // function resetGhosts - clears out ghosts at end of board and respawns
 //
+// not called anymore
+//
 function resetGhosts()
 {
     for (var i=0; i<ghosts.length; i++)
@@ -1796,9 +1799,11 @@ function resetGhosts()
     }  // end for loop
 
     // spawn a new ghost for each one on the board
+    // not used
     reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
 
     // spawn a new ghost for each one on the board
+    // not used
     reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
 
 } // end function eatGhosts
