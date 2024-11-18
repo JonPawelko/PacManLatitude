@@ -12,26 +12,24 @@
 // Jon's Pacman game ------------------------
 
 // Configurable game components
-const NUM_ROWS = 10;
-const NUM_COLUMNS = 10;
-const WALL_PCT = .1;   // % of walls on board
+const NUM_ROWS = 14;
+const NUM_COLUMNS = 30;
+const WALL_PCT = .25;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
-const NUM_GHOSTS = 5;   // number of ghosts to create on each level
+const NUM_GHOSTS = 8;   // number of ghosts to create on each level
 const GHOST_SMARTS = 90; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
-const GHOST_RESPAWN_DELAY = 5;  // delay in seconds for dead ghosts to respawn
+const GHOST_RESPAWN_DELAY = 4;  // delay in seconds for dead ghosts to respawn
 const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner when pacman spawns or respawns
 const GHOST_SPEED = 1;  // how often ghosts move in seconds
 const RESET_PLAYER_DELAY = 3; // seconds
 const LIVES_START = 3;
 const BOMBS_START_COUNT = 10;
-const POWER_PELLETS_START_COUNT = 8;  // num of pp per board
+const POWER_PELLETS_START_COUNT = Math.floor(((NUM_ROWS*NUM_COLUMNS)+1)/40);  // num of pp per board, 1 per 40 squares
 const POINTS_PER_GHOST = 10;
 const POWER_PELLET_DELAY = 8; // pacman gets this many seconds to kill ghosts after eating pp
 const BOMB_DELAY = 4;   // bombs blow up in this many seconds
 const GOOD_BOMB_DELAY = 10; // how frequently good bombs are dropped
 const GOOD_BOMB_DURATION = 9; // how many seconds a good bomb exists before disappearing
-const TUNNEL1_SQUARE_NUM = 23;
-const TUNNEL2_SQUARE_NUM = 77;
 
 const GHOST_TYPE_NORMAL = 0;
 const GHOST_TYPE_RABID = 1;
@@ -94,9 +92,6 @@ var ICON_POWER_PELLET = "<img src='graphics/PowerPellet.jpg'>";
 var ICON_TUNNEL = "<img src='graphics/tunnel.jpg'>";
 var ICON_GHOST_RABID = "<img src='graphics/rabidGhost.jpg'>"
 
-const RESOLVE_PACMAN_FAIL = 0;
-const RESOLVE_PACMAN_SUCCESS = 1;
-const RESOLVE_PACMAN_DEATH = -1;
 
 const GAME_MODE_POWER_OFF = 0;
 const GAME_MODE_POWER_ON = 1;
@@ -112,7 +107,7 @@ const OFF_THE_BOARD = -1;  // square num when dead or off the board
 var walls;  // create the array each time a new board is started
 var pellets;  // create the array each time a new board is started
 var powerPellets;  // create the array each time a new board is started
-var ghosts = new Array;   // use the same ghosts array the whole game
+var ghosts = new Array;   // new ghost array each board
 var bombs = new Array;    // dropped by pacman, bombs are similar to ghosts, 1 array position per bomb, not per square
 var goodBombs = new Array;  // similar structure to pellets
 
@@ -138,7 +133,7 @@ var pacmanIcon;   // stores which icon pacman should use based on direction
 // -----   Start Main Driver section  -----------------
 // ----------------------------------------------------
 
-// Initialize game components
+// Begin "Driver" section - Initialize game components
 createBoard();
 
 updateScoreboard();
@@ -157,7 +152,8 @@ spawnAllGhosts();
 
 respawnPacmanTimer();
 
-
+// End Driver section
+//
 // ----------------------------------------------------
 // -----   End Main Driver section  -----------------
 // ----------------------------------------------------
@@ -219,7 +215,6 @@ function buildWallsAndPellets()
   walls = new Array;
   pellets = new Array;
 
-
   // iterate through each square
   for (var i=0; i<NUM_ROWS*NUM_COLUMNS; i++)
   {
@@ -264,10 +259,6 @@ function buildWallsAndPellets()
     totalPellets++;
   }
 
-  // test walls
-  // walls[1] = 1;
-  // walls[25] = 1;
-
 } // end function buildWallsAndPellets
 
 // -------------------------------------------------------------------------
@@ -300,8 +291,8 @@ function createPowerPelletsAndGoodBombs()
       // floor of Math.random * (NUM_ROWS*NUM_COLUMNS - 2) = 0 to 98, add 1 = 1 to 99 (correct)
       var ppSquare = Math.floor(Math.random() * ((NUM_ROWS*NUM_COLUMNS)-2)) + 1;  // return any square on board except 0.
 
-      // pellet found, flip to PP
-      if (pellets[ppSquare] == 1)
+      // pellet found, flip to PP, don't put in square 0
+      if ((pellets[ppSquare] == 1) && (ppSquare != 0))
       {
         squareFound = true;
         pellets[ppSquare] = 0;
@@ -319,7 +310,12 @@ function createPowerPelletsAndGoodBombs()
 function createTunnel()
 {
   var squareFound = false;
-  var target = TUNNEL1_SQUARE_NUM;
+
+  // calculate the first tunnel to be in the upper left
+  var target = (Math.floor((.2*NUM_ROWS))*NUM_COLUMNS) + Math.floor(.10*NUM_COLUMNS);
+
+  // console.log("Target1 is " + target);
+  // return;
 
     // loop until you find a square with a regular pellet on it, replace it with tunnel1
     while (squareFound == false)
@@ -339,7 +335,11 @@ function createTunnel()
     } // end while
 
     squareFound = false;
-    target = TUNNEL2_SQUARE_NUM;
+
+    // calculate the second tunnel to be in the bottom right
+    target = (Math.floor((.75*NUM_ROWS))*NUM_COLUMNS) + Math.floor(.85*NUM_COLUMNS);
+
+    // console.log("Target2 is " + target);
 
       // loop until you find a square with a regular pellet on it, replace it with tunnel1
       while (squareFound == false)
@@ -424,8 +424,6 @@ function resetBoard()
       myPowerPelletTimerVar = -1;
     }
 
-    // resetGhosts();
-
     clearGhostTimers();
 
     updateScoreboard();
@@ -483,7 +481,7 @@ function spawnPacman()
 }  // end function spawnPacman
 
 // -----------------------------------------------------------------------------------
-// Function respawnPacmanTimer called after pacman is killed
+// Function respawnPacmanTimer called after pacman is killed or on a new level
 // -----------------------------------------------------------------------------------
 
 function respawnPacmanTimer()
@@ -1849,36 +1847,6 @@ function clearGhostTimers()
 } // end function
 
 // -------------------------------------------------------
-
-
-// ----------------------------------------------
-// function resetGhosts - clears out ghosts at end of board and respawns
-//
-// not called anymore
-//
-function resetGhosts()
-{
-    for (var i=0; i<ghosts.length; i++)
-    {
-      if (ghosts[i].squareNum != -1)
-      {
-        // console.log("Reset Ghost " + i + " in squarenum " + current);
-        ghosts[i].squareNum = OFF_THE_BOARD;
-      } // end if
-
-    }  // end for loop
-
-    // spawn a new ghost for each one on the board
-    // not used
-    reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
-
-    // spawn a new ghost for each one on the board
-    // not used
-    reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)));  // return any square on board
-
-} // end function eatGhosts
-
-// end function resetGhosts -----------------------
 //
 // function processGhostTunnel
 //
