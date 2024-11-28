@@ -1,4 +1,5 @@
 // Release Notes
+// v1.14 11-28-24 - Added Poison Ghost - reconfigured ghost logic
 // v1.13 11-16-24 - Ghost respawn delay configurable, game over
 // v1.12 11-13-24 - Updated ghost spawning logic, now configurable
 // v1.11 11-12-24 - Rabid ghost type added, runs towards pacman when pacman in PP mode
@@ -12,8 +13,8 @@
 // Jon's Pacman game ------------------------
 
 // Configurable game components
-const NUM_ROWS = 14;
-const NUM_COLUMNS = 30;
+const NUM_ROWS = 14;  // 14
+const NUM_COLUMNS = 30;  // 30
 const WALL_PCT = .25;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
 const NUM_GHOSTS = 8;   // number of ghosts to create on each level
@@ -30,9 +31,12 @@ const POWER_PELLET_DELAY = 8; // pacman gets this many seconds to kill ghosts af
 const BOMB_DELAY = 4;   // bombs blow up in this many seconds
 const GOOD_BOMB_DELAY = 10; // how frequently good bombs are dropped
 const GOOD_BOMB_DURATION = 9; // how many seconds a good bomb exists before disappearing
+const POISON_DELAY = 5;   // how many seconds poison lasts
+const POISON_PERCENT = .4; // How ofen poison ghost drops poison
 
 const GHOST_TYPE_NORMAL = 0;
 const GHOST_TYPE_RABID = 1;
+const GHOST_TYPE_POISON = 2;
 
 // Global variables
 var current;    // pacman's current square
@@ -53,6 +57,9 @@ var tunnel2num;
 var myPowerPelletTimerVar;  // used to end pp phase
 var ghostsCreated;
 var ghostsEaten;
+var regGhostCount = 0;
+var rabidGhostCount = 0;
+var poisonGhostCount = 0;
 var goodBombTimerID;
 var cancelGoodBombTimerID;
 
@@ -84,13 +91,16 @@ var PACMAN_CLASSIC_LEFT_PP = "<img src='graphics/Pacman icon left PP.jpg'>";
 var PACMAN_CLASSIC_UP_PP = "<img src='graphics/Pacman icon up PP.jpg'>";
 var PACMAN_CLASSIC_DOWN_PP = "<img src='graphics/Pacman icon down PP.jpg'>";
 var ICON_WALL = "<img src='graphics/wallIcon.jpg'>";
-var ICON_GHOST = "<img src='graphics/blueGhost.jpg'>";
 var ICON_PELLET = "<img src='graphics/PelletIcon.jpg'>";
 var ICON_BOMB = "<img src='graphics/BombIcon1.jpg'>";
 var ICON_GOOD_BOMB = "<img src='graphics/GoodBombIcon.jpg'>";
 var ICON_POWER_PELLET = "<img src='graphics/PowerPellet.jpg'>";
 var ICON_TUNNEL = "<img src='graphics/tunnel.jpg'>";
+var ICON_POISON = "<img src='graphics/poison.jpg'>";
+
+var ICON_GHOST = "<img src='graphics/blueGhost.jpg'>";
 var ICON_GHOST_RABID = "<img src='graphics/rabidGhost.jpg'>"
+var ICON_GHOST_POISON = "<img src='graphics/poisonGhost.jpg'>"
 
 
 const GAME_MODE_POWER_OFF = 0;
@@ -104,12 +114,15 @@ const OFF_THE_BOARD = -1;  // square num when dead or off the board
 // -------------------------------------------------------------------
 // Initialize global variables
 
+// All arrays here
 var walls;  // create the array each time a new board is started
 var pellets;  // create the array each time a new board is started
 var powerPellets;  // create the array each time a new board is started
+
 var ghosts = new Array;   // new ghost array each board
 var bombs = new Array;    // dropped by pacman, bombs are similar to ghosts, 1 array position per bomb, not per square
 var goodBombs = new Array;  // similar structure to pellets
+var poison = new Array;   // similar to bombs, but dropped by ghosts
 
 totalPellets = 0;
 pelletsEaten = 0;
@@ -136,11 +149,9 @@ var pacmanIcon;   // stores which icon pacman should use based on direction
 // Begin "Driver" section - Initialize game components
 createBoard();
 
-updateScoreboard();
-
 buildWallsAndPellets();
 
-createPowerPelletsAndGoodBombs();
+createItems();
 
 createTunnel();
 
@@ -148,7 +159,9 @@ drawInitialBoard();
 
 startGoodBombTimer();
 
-spawnAllGhosts();
+setTimeout( spawnAllGhosts, 2000);
+
+updateScoreboard();
 
 respawnPacmanTimer();
 
@@ -205,6 +218,11 @@ function updateScoreboard()
   document.getElementById("scoreVariable").innerHTML = score;
   document.getElementById("levelVariable").innerHTML = level;
   document.getElementById("bombsVariable").innerHTML = bombCount;
+
+  document.getElementById("regGhostCount").innerHTML = regGhostCount;
+  document.getElementById("rabidGhostCount").innerHTML = rabidGhostCount;
+  document.getElementById("poisonGhostCount").innerHTML = poisonGhostCount;
+
 }
 
 // -----------------------------------------------------------------------
@@ -262,20 +280,25 @@ function buildWallsAndPellets()
 } // end function buildWallsAndPellets
 
 // -------------------------------------------------------------------------
+// This function creates the power pellets, good bombs, and poison arrays
+// Creates some PP, but not good bombs or poison, those are created later
 
-function createPowerPelletsAndGoodBombs()
+function createItems()
 {
   var squareFound = false;
   var i;
 
-  // reset pp array if it exists
+  // reset arrays
   powerPellets = new Array;
+  goodBombs = new Array;
+  poison = new Array;
 
-  // default both pp and good bombs arrays to zeros
+  // default all arrays to zeros
   for (i=0; i< NUM_ROWS*NUM_COLUMNS; i++)
   {
     powerPellets[i] = 0;
-    goodBombs[i] = 0;     // new code
+    goodBombs[i] = 0;
+    poison[i] = 0;
   }
 
   // now create some pp
@@ -303,7 +326,7 @@ function createPowerPelletsAndGoodBombs()
 
   } // end for
 
-}  // end function createPowerPellets
+}  // end function createItems
 
 // --------------------------------------------------
 
@@ -315,7 +338,6 @@ function createTunnel()
   var target = (Math.floor((.2*NUM_ROWS))*NUM_COLUMNS) + Math.floor(.10*NUM_COLUMNS);
 
   // console.log("Target1 is " + target);
-  // return;
 
     // loop until you find a square with a regular pellet on it, replace it with tunnel1
     while (squareFound == false)
@@ -416,6 +438,9 @@ function resetBoard()
     numPowerPellets = POWER_PELLETS_START_COUNT;
     level++;
     gameMode = GAME_MODE_POWER_OFF;
+    regGhostCount = 0;
+    rabidGhostCount = 0;
+    poisonGhostCount = 0;
 
     // turn off PP if on
     if (myPowerPelletTimerVar != -1)
@@ -426,17 +451,17 @@ function resetBoard()
 
     clearGhostTimers();
 
-    updateScoreboard();
-
     buildWallsAndPellets();
 
-    createPowerPelletsAndGoodBombs();
+    createItems();
 
     createTunnel();
 
     drawInitialBoard();
 
     spawnAllGhosts();
+
+    updateScoreboard();
 
     // respawn pacman
     setTimeout( respawnPacmanTimer, RESET_PLAYER_DELAY*1000);
@@ -671,6 +696,13 @@ function resolvePacMan(direction)
             }
           }
 
+          // function returns true if on poison
+          if (checkForPoison())
+          {
+              killPacman();
+              return SUCCESS;
+          }
+
           checkForGoodBomb();
           checkForPellets();
 
@@ -713,6 +745,12 @@ function resolvePacMan(direction)
           {
               eatGhosts();
           }
+        }
+
+        if (checkForPoison())
+        {
+            killPacman();
+            return SUCCESS;
         }
 
         checkForGoodBomb();
@@ -758,6 +796,12 @@ function resolvePacMan(direction)
           }
         }
 
+        if (checkForPoison())
+        {
+            killPacman();
+            return SUCCESS;
+        }
+
         checkForGoodBomb();
         checkForPellets();
 
@@ -801,6 +845,12 @@ function resolvePacMan(direction)
           }
         }
 
+        if (checkForPoison())
+        {
+            killPacman();
+            return SUCCESS;
+        }
+
         checkForGoodBomb();
         checkForPellets();
 
@@ -829,6 +879,9 @@ function killPacman()
 
     lives--;
     document.getElementById("livesVariable").innerHTML = lives;
+    current = OFF_THE_BOARD;
+    pacmanIcon = PACMAN_CLASSIC_RIGHT;
+    gameMode = GAME_MODE_POWER_OFF;
 
     squares = document.querySelectorAll('.square');  // faster to get first?
 
@@ -850,7 +903,7 @@ function killPacman()
           // show last ghost that whacked pacman
           if (ghosts[i].squareNum == current)
           {
-            squares[current].innerHTML = (ghosts[i].ghost_type == GHOST_TYPE_NORMAL) ? ICON_GHOST : ICON_GHOST_RABID;
+            squares[current].innerHTML = getGhostIcon(ghosts[i].ghost_type);
           }
 
           // ghosts[i].squareNum = -1;
@@ -869,7 +922,7 @@ function killPacman()
 
     }
 
-    current = OFF_THE_BOARD;
+
 
 }
 
@@ -889,6 +942,21 @@ function eatGhosts()
       // console.log("Found a ghost to Eat " + i);
 
       ghostsEaten++;
+
+      if (ghosts[i].ghost_type == GHOST_TYPE_POISON)
+      {
+        poisonGhostCount--;
+      }
+      else
+      {
+        if (ghosts[i].ghost_type == GHOST_TYPE_RABID)
+          rabidGhostCount--;
+        else
+          regGhostCount--;
+      }
+
+      updateScoreboard();
+
       ghosts[i].squareNum = OFF_THE_BOARD;
       // console.log("Ate Ghost " + i + " in squarenum " + current + " total ghosts eaten is " + ghostsEaten + "  total ghosts created is " + ghostsCreated + " at " + (new Date()));
 
@@ -1090,8 +1158,8 @@ function myGoodBombTimer()
       {
           var targetSpot = Math.floor(Math.random() * NUM_ROWS * NUM_COLUMNS);
 
-          // make sure no pp as well, also no pacman, no tunnels
-          if ((walls[targetSpot] == 0) && (powerPellets[targetSpot] == 0) && (targetSpot != current) && (targetSpot != tunnel1num) && (targetSpot != tunnel2num))
+          // make sure no pp as well, also no pacman, no tunnels, no poison
+          if ((walls[targetSpot] == 0) && (powerPellets[targetSpot] == 0) && (targetSpot != current) && (targetSpot != tunnel1num) && (targetSpot != tunnel2num) && (poison[targetSpot] == 0))
           {
             // space clear so far, now check for any bombs
 
@@ -1139,7 +1207,7 @@ function cancelGoodBombTimer(pos)
 
   if (ghostFound == true)
   {
-      squares[pos].innerHTML = (ghosts[i-1].ghost_type == GHOST_TYPE_NORMAL) ? ICON_GHOST : ICON_GHOST_RABID;
+      squares[pos].innerHTML = getGhostIcon(ghosts[i-1].ghost_type);
   }
   else
   {
@@ -1167,6 +1235,17 @@ function checkForGoodBomb()
   }
 
 }  // end function checkForGoodBomb() --------------
+
+// -------------------------------------------------
+//
+function checkForPoison()
+{
+    if (poison[current]==1)
+      return true;
+    else
+      return false;
+
+}
 
 // --------------------------------------------------
 // function processPacmanTunnel
@@ -1238,17 +1317,34 @@ function spawnGhost(squareNum)
 
   // randomly determine which type of ghost
 
-  var tempGhostType = (Math.floor(Math.random() * 2));
+  var tempGhostType = (Math.floor(Math.random() * 3));  // number of ghost types = 3
+  // var tempGhostType = 2;
 
-  // push ghost onto array with it's timer id and location
-  ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId, respawnId: -1});
+  if (tempGhostType == GHOST_TYPE_POISON)
+  {
+    poisonGhostCount++;
+    var poisonTimerIds = new Array;
+    ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId, respawnId: -1, poisonTimers: poisonTimerIds});
+  }
+  else
+  {
+    if (tempGhostType == GHOST_TYPE_RABID)
+      rabidGhostCount++;
+    else
+      regGhostCount++;
+
+    // push ghost onto array with it's timer id and location
+    ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId, respawnId: -1});
+  }
+
+  updateScoreboard();
 
   // console.log(ghosts);
 
   // Draw ghost on board.  Later redraws are handled by the tick timer function
   squares = document.querySelectorAll('.square');  // faster to get first?
 
-  squares[squareNum].innerHTML = (ghosts[ghosts.length-1].ghost_type == GHOST_TYPE_NORMAL) ? ICON_GHOST : ICON_GHOST_RABID;
+  squares[squareNum].innerHTML = getGhostIcon(ghosts[ghosts.length-1].ghost_type);
 
 } // end function spawnGhost
 
@@ -1294,14 +1390,31 @@ function reSpawnGhost(squareNum, ghostType)
   // create timer thread
   var tempTimerId = setInterval(ghostTick, GHOST_SPEED * 1000 * (1+ghostRandomizer), ghosts.length);
 
+  // Handle poison ghost respawn
+
+  if (ghostType == GHOST_TYPE_POISON)
+  {
+    poisonGhostCount++;
+    var poisonTimerIds = new Array;
+    ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId, respawnId: -1, poisonTimers: poisonTimerIds});
+  }
+  else
+  {
+    if (ghostType == GHOST_TYPE_RABID)
+      rabidGhostCount++;
+    else
+      regGhostCount++;
+
+    // push ghost onto array with it's timer id and location
+    ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId, respawnId: -1});
+  }
+
+  updateScoreboard();
+
   // console.log("Ghost speed created " + GHOST_SPEED * 1000 * (1+ghostRandomizer));
-
-  // push ghost onto array with it's location, type, and timer id
-  ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId, respawnId: -1});
-
-  var temp = new String((ghosts.length)-1);
-
+  // var temp = new String((ghosts.length)-1);
   // console.log("New ghost num " + temp + " of type " + ghostType + " spawned in square " + squareNum + "  total ghosts created is " + ghostsCreated + " at " + " at " + (new Date()));
+
   // Later redraws are handled by the tick timer function
 
 } // end function spawnGhost
@@ -1317,6 +1430,7 @@ function ghostTick(ghostId)
   var dir; // dir 0 = right, 1 = left, 2 = up, 3 = down
 
   // console.log("Ghost tick called for ghost id " + ghostId);
+  // console.log(ghosts);
 
   // loop until a legal move is found or 15 tries
   while ((legalMove == FAIL) && (tries < 15) && (ghosts[ghostId].squareNum != OFF_THE_BOARD))
@@ -1414,6 +1528,8 @@ function legalGhostMove(ghostId,dir)
 
 function resolveGhost(ghostId,dir)
 {
+    var oldSquare = ghosts[ghostId].squareNum;
+
     switch(dir)
     {
       case RIGHT:
@@ -1422,7 +1538,8 @@ function resolveGhost(ghostId,dir)
 
         checkIfOnGhostPacman(ghostId);
 
-        processGhostTunnel(ghostId);
+        if (!processGhostTunnel(ghostId))
+          processPoison(ghostId,oldSquare);
 
         break;
 
@@ -1432,7 +1549,8 @@ function resolveGhost(ghostId,dir)
 
         checkIfOnGhostPacman(ghostId);
 
-        processGhostTunnel(ghostId);
+        if (!processGhostTunnel(ghostId))
+          processPoison(ghostId,oldSquare);
 
         break;
 
@@ -1442,7 +1560,8 @@ function resolveGhost(ghostId,dir)
 
         checkIfOnGhostPacman(ghostId);
 
-        processGhostTunnel(ghostId);
+        if (!processGhostTunnel(ghostId))
+          processPoison(ghostId,oldSquare);
 
         break;
 
@@ -1452,7 +1571,8 @@ function resolveGhost(ghostId,dir)
 
         checkIfOnGhostPacman(ghostId);
 
-        processGhostTunnel(ghostId);
+        if (!processGhostTunnel(ghostId))
+          processPoison(ghostId,oldSquare);
 
         break;
 
@@ -1472,7 +1592,7 @@ function redrawBoardGhost(ghostId, oldSquare)
 
     if (ghosts[ghostId].squareNum != OFF_THE_BOARD)
     {
-        squares[ghosts[ghostId].squareNum].innerHTML = (ghosts[ghostId].ghost_type == GHOST_TYPE_NORMAL) ? ICON_GHOST : ICON_GHOST_RABID;
+        squares[ghosts[ghostId].squareNum].innerHTML = getGhostIcon(ghosts[ghostId].ghost_type);
     }
     // Check what needs to be in old square, could be anything including a wall - in between screen glitch
 
@@ -1493,49 +1613,57 @@ function redrawBoardGhost(ghostId, oldSquare)
     // no bomb, keep checking
     if (bombFound == false)
     {
-      if (goodBombs[oldSquare] == 1)
+      if (poison[oldSquare] == 1)
       {
-          squares[oldSquare].innerHTML = ICON_GOOD_BOMB;
+          squares[oldSquare].innerHTML = ICON_POISON;
       }
       else
       {
-          // check for pellet
-          if (pellets[oldSquare] == 1)
+          if (goodBombs[oldSquare] == 1)
           {
-              squares[oldSquare].innerHTML = ICON_PELLET;
+              squares[oldSquare].innerHTML = ICON_GOOD_BOMB;
           }
-          else  // no pellet
+          else
           {
-              if (powerPellets[oldSquare] == 1)
+              // check for pellet
+              if (pellets[oldSquare] == 1)
               {
-                  squares[oldSquare].innerHTML = ICON_POWER_PELLET;
+                  squares[oldSquare].innerHTML = ICON_PELLET;
               }
-              else  // no pp
+              else  // no pellet
               {
-                  if ((oldSquare == tunnel1num) || (oldSquare == tunnel2num))
+                  if (powerPellets[oldSquare] == 1)
                   {
-                      squares[oldSquare].innerHTML = ICON_TUNNEL;
+                      squares[oldSquare].innerHTML = ICON_POWER_PELLET;
                   }
-                  else
+                  else  // no pp
                   {
-
-                      if (walls[oldSquare] == 1)
+                      if ((oldSquare == tunnel1num) || (oldSquare == tunnel2num))
                       {
-                          squares[oldSquare].innerHTML = ICON_WALL;
+                          squares[oldSquare].innerHTML = ICON_TUNNEL;
                       }
                       else
                       {
-                          squares[oldSquare].innerHTML = "";
-                      }   // else check for wall
+
+                          if (walls[oldSquare] == 1)
+                          {
+                              squares[oldSquare].innerHTML = ICON_WALL;
+                          }
+                          else
+                          {
+                              squares[oldSquare].innerHTML = "";
+                          }   // else check for wall
 
 
-                  } // end else tunnel check
+                      } // end else tunnel check
 
-              }  // end else check for pp
+                  }  // end else check for pp
 
-          } // end else check for pellet
+              } // end else check for pellet
 
-      } // end outer else, check for good bomb
+          } // end outer else, check for good bomb
+
+        } // end check for poison
 
     } // end check for bomb
 
@@ -1562,6 +1690,12 @@ function calcGhostDirection(type, pos)
       if (random <= GHOST_SMARTS)
       {
         // console.log("Returned up");
+
+        // if normal ghost, do something
+
+        // if rabid ghost, do something
+
+        // if Mole ghost, ....
 
         // return UP if in regular game mode or DOWN if in PP mode
         return (gameMode == GAME_MODE_POWER_OFF) ? UP : (type != GHOST_TYPE_RABID) ? DOWN : UP;
@@ -1842,6 +1976,15 @@ function clearGhostTimers()
         clearTimeout(ghosts[i].respawnId);
       }
 
+      if (ghosts[i].ghost_type == GHOST_TYPE_POISON)
+      {
+        for (var j=0; j<ghosts[i].poisonTimers.length;j++)
+        {
+          if (ghosts[i].poisonTimers[j] != -1)
+            clearTimeout(ghosts[i].poisonTimers[j]);
+        }
+      }
+
     }  // end for loop
 
 } // end function
@@ -1859,6 +2002,7 @@ function processGhostTunnel(ghostId)
     // need to redraw tunnel square
     squares[tunnel1num].innerHTML = ICON_TUNNEL;
     ghosts[ghostId].squareNum = tunnel2num;
+    return true;
   }
   else
   {
@@ -1866,10 +2010,112 @@ function processGhostTunnel(ghostId)
       {
         squares[tunnel2num].innerHTML = ICON_TUNNEL;
         ghosts[ghostId].squareNum = tunnel1num;
+        return true;
       }
   } // end else
 
+  return false;
+
 }  // end function processGhostTunnel ---------------
+
+// --------------------------------------------------
+//
+function getGhostIcon(type)
+{
+  switch (type) {
+
+    case GHOST_TYPE_NORMAL:
+
+      return ICON_GHOST;
+      break;
+
+    case GHOST_TYPE_RABID:
+
+      return ICON_GHOST_RABID;
+      break;
+
+    case GHOST_TYPE_POISON:
+
+        return ICON_GHOST_POISON;
+        break;
+
+    default:
+        return "Error - Incorrect Ghost Type";
+
+  }
+}
+
+// end function getGhostIcon -------------
+// --------------------------------------------------
+//
+
+// --------------------------------------------------
+//
+
+function processPoison(ghostId,oldSquare)
+{
+    // console.log("Process Poison - array is " + poison);
+
+    // randomly determine if drop poison if right type of ghost
+    if (ghosts[ghostId].ghost_type == GHOST_TYPE_POISON)
+    {
+        var check = Math.floor(Math.random() * 100) + 1;
+        // console.log("Check is " + check);
+
+        // don't drop poison on existing poison or tunnel or goodbomb
+        if ((check < POISON_PERCENT * 100) && (poison[oldSquare] != 1) && (oldSquare != tunnel1num) && (oldSquare != tunnel2num) && (goodBombs[oldSquare] != 1))
+        {
+            // need to send save each timer id in case board ends with multiple poisons on the board
+            var myPoisonCount = ghosts[ghostId].poisonTimers.length;
+
+            // console.log("Dropping poison in square " + oldSquare);
+            var tempTimerId = setTimeout(myPoisonTimer, POISON_DELAY * 1000, ghostId, oldSquare, myPoisonCount);
+            ghosts[ghostId].poisonTimers.push(tempTimerId);
+            poison[oldSquare] = 1;
+        }
+    } // end if
+
+}
+
+// -------------------------------------------------
+// Need to pass in both because a ghost could have moved since dropping poison
+
+function myPoisonTimer(ghostId,squareNum,myPoisonCounter)
+{
+    //console.log("Poison timer called for poison in square " + squareNum);
+
+    poison[squareNum] = 0;
+    ghosts[ghostId].poisonTimers[myPoisonCounter] = -1;  // reset
+
+    squares = document.querySelectorAll('.square');  // faster to get first?
+
+    if (goodBombs[squareNum] == 1)
+    {
+        squares[squareNum].innerHTML = ICON_GOOD_BOMB;
+    }
+    else
+    {
+        // check for pellet
+        if (pellets[squareNum] == 1)
+        {
+            squares[squareNum].innerHTML = ICON_PELLET;
+        }
+        else  // no pellet
+        {
+            if (powerPellets[squareNum] == 1)
+            {
+                squares[squareNum].innerHTML = ICON_POWER_PELLET;
+            }
+            else {
+              squares[squareNum].innerHTML = "";
+            }
+        }
+    }
+
+}   // end pp timer function
+
+
+// -------------------------------------------------
 
 // -------------------------------------------------
 // ---------  End Ghost function section ---------
