@@ -13,11 +13,11 @@
 // Jon's Pacman game ------------------------
 
 // Configurable game components
-const NUM_ROWS = 14;  // 14
-const NUM_COLUMNS = 30;  // 30
+const NUM_ROWS = 10;  // 14
+const NUM_COLUMNS = 10;  // 30
 const WALL_PCT = .20;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
-const NUM_GHOSTS = 50;   // number of ghosts to create on each level
+const NUM_GHOSTS = 5;   // number of ghosts to create on each level
 const GHOST_SMARTS = 80; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
 const GHOST_RESPAWN_DELAY = 4;  // delay in seconds for dead ghosts to respawn
 const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner when pacman spawns or respawns
@@ -105,6 +105,7 @@ var ICON_GHOST_POISON = "<img src='graphics/poisonGhost.jpg'>"
 
 const GAME_MODE_POWER_OFF = 0;
 const GAME_MODE_POWER_ON = 1;
+const GAME_MODE_OVER = -1;
 
 const GHOST_NOT_FOUND = 0;
 const GHOST_FOUND = 1;
@@ -558,6 +559,7 @@ function respawnPacmanTimer()
 
 function redrawBoardPacman(oldSquare, newSquare)
 {
+    // zzz
     var bombFound = false;
     squares = document.querySelectorAll('.square');
 
@@ -584,7 +586,7 @@ function redrawBoardPacman(oldSquare, newSquare)
     } // finish else - old square handled
 
     // deal with new square
-    if (current != OFF_THE_BOARD)
+    if ((current != OFF_THE_BOARD) && (gameMode != GAME_MODE_OVER))
       squares[newSquare].innerHTML = pacmanIcon; // set pac man on new current
 
 }   // end function redrawBoardPacman
@@ -879,17 +881,22 @@ function killPacman()
 
     lives--;
     document.getElementById("livesVariable").innerHTML = lives;
-    current = OFF_THE_BOARD;
-    pacmanIcon = PACMAN_CLASSIC_RIGHT;
+
     gameMode = GAME_MODE_POWER_OFF;
 
     squares = document.querySelectorAll('.square');  // faster to get first?
 
     if (lives > 0)
+    {
+      current = OFF_THE_BOARD;
+      pacmanIcon = PACMAN_CLASSIC_RIGHT;
+
       // launch the respawn timer function
       setTimeout( respawnPacmanTimer, RESET_PLAYER_DELAY*1000);
+    }
     else
     {
+      gameMode = GAME_MODE_OVER;
       // Game Over stop all game components
       for (var i=0; i<ghosts.length; i++)
       {
@@ -903,11 +910,22 @@ function killPacman()
           // show last ghost that whacked pacman
           if (ghosts[i].squareNum == current)
           {
+            console.log("Last ghost that whacked pacman");
             squares[current].innerHTML = getGhostIcon(ghosts[i].ghost_type);
           }
 
+          // clear poison timers
+          if (ghosts[i].ghost_type == GHOST_TYPE_POISON)
+          {
+              for (var j=0; j<ghosts[i].poisonTimers.length;j++)
+              {
+                if (ghosts[i].poisonTimers[j] != -1)
+                  clearTimeout(ghosts[i].poisonTimers[j]);
+              }
+          }
+
           // ghosts[i].squareNum = -1;
-      }
+      } // end for loop
 
       clearInterval(goodBombTimerID);
 
@@ -922,10 +940,7 @@ function killPacman()
 
     }
 
-
-
 }
-
 // ---  end function killPacman --------------------
 
 // -------------------------------------------------
@@ -1296,7 +1311,7 @@ function spawnAllGhosts()
 
     for (var i=0; i<NUM_GHOSTS; i++)
     {
-        // zzz - don't spawn ghost in safety zone
+        // don't spawn ghost in safety zone
         var safe = false;
         var pos;
 
