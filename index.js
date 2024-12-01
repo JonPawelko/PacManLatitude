@@ -15,10 +15,10 @@
 // Configurable game components
 const NUM_ROWS = 14;  // 14
 const NUM_COLUMNS = 30;  // 30
-const WALL_PCT = .25;   // % of walls on board
+const WALL_PCT = .20;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
-const NUM_GHOSTS = 8;   // number of ghosts to create on each level
-const GHOST_SMARTS = 90; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
+const NUM_GHOSTS = 50;   // number of ghosts to create on each level
+const GHOST_SMARTS = 80; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
 const GHOST_RESPAWN_DELAY = 4;  // delay in seconds for dead ghosts to respawn
 const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner when pacman spawns or respawns
 const GHOST_SPEED = 1;  // how often ghosts move in seconds
@@ -1194,7 +1194,14 @@ function cancelGoodBombTimer(pos)
 
   squares = document.querySelectorAll('.square');
 
-  // Check if ghost exists on the square first, then pellet
+  // Check if Pacman on square first
+  if (current == pos)
+  {
+    squares[pos].innerHTML = pacmanIcon;
+    return;
+  }
+
+  // Check if ghost exists on the square, then pellet
   var ghostFound = false;
   var i=0;
 
@@ -1289,7 +1296,19 @@ function spawnAllGhosts()
 
     for (var i=0; i<NUM_GHOSTS; i++)
     {
-        spawnGhost(Math.floor(Math.random() * NUM_ROWS*NUM_COLUMNS));
+        // zzz - don't spawn ghost in safety zone
+        var safe = false;
+        var pos;
+
+        while (safe == false)
+        {
+            pos = Math.floor(Math.random() * NUM_ROWS*NUM_COLUMNS);
+
+            // check function returns true if ghost in safetey zone
+            safe = !checkIfGhostInSafetyZone(pos, SAFE_ZONE_SIZE);
+        }
+
+        spawnGhost(pos);
     }
 
 }  // end function spawnAllGhosts
