@@ -1,4 +1,6 @@
 // Release Notes
+// v1.16 12-8-24 - Added audio effects
+// v1.15 12-2-24  - Mostly minor bug fixes
 // v1.14 11-28-24 - Added Poison Ghost - reconfigured ghost logic
 // v1.13 11-16-24 - Ghost respawn delay configurable, game over
 // v1.12 11-13-24 - Updated ghost spawning logic, now configurable
@@ -13,8 +15,8 @@
 // Jon's Pacman game ------------------------
 
 // Configurable game components
-const NUM_ROWS = 10;  // 14
-const NUM_COLUMNS = 10;  // 30
+const NUM_ROWS = 18;  // 14
+const NUM_COLUMNS = 34;  // 30
 const WALL_PCT = .20;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
 const NUM_GHOSTS = 5;   // number of ghosts to create on each level
@@ -32,11 +34,19 @@ const BOMB_DELAY = 4;   // bombs blow up in this many seconds
 const GOOD_BOMB_DELAY = 10; // how frequently good bombs are dropped
 const GOOD_BOMB_DURATION = 9; // how many seconds a good bomb exists before disappearing
 const POISON_DELAY = 5;   // how many seconds poison lasts
-const POISON_PERCENT = .4; // How ofen poison ghost drops poison
+const POISON_PERCENT = .05; // How ofen poison ghost drops poison
 
 const GHOST_TYPE_NORMAL = 0;
 const GHOST_TYPE_RABID = 1;
 const GHOST_TYPE_POISON = 2;
+
+const BACKGROUND_AUDIO = "sounds/pacmanfever.mp3";
+const KILLED_BY_GHOST_AUDIO = "sounds/killedByGhost.mp3";
+
+var myAudio = new Audio; // ("sounds/pacmanfever.mp3");
+var musicStarted = false;
+
+
 
 // Global variables
 var current;    // pacman's current square
@@ -158,13 +168,7 @@ createTunnel();
 
 drawInitialBoard();
 
-startGoodBombTimer();
-
-setTimeout( spawnAllGhosts, 2000);
-
-updateScoreboard();
-
-respawnPacmanTimer();
+// Wait here for start button click
 
 // End Driver section
 //
@@ -181,6 +185,15 @@ respawnPacmanTimer();
 function checkKey(evt)
 {
   var oldCurr = current;
+
+  // if (musicStarted == false)
+  // {
+  //     musicStarted = true;
+  //
+  //     myAudio.src = BACKGROUND_AUDIO;
+  //     // myAudio.muted = true;
+  //     myAudio.play(); // zzz
+  // }
 
   // only intercept keys if pacman on the board
   if (current != OFF_THE_BOARD)
@@ -878,6 +891,8 @@ function resolvePacMan(direction)
 // --------------------------------------------
 function killPacman()
 {
+    var killPacmanAudio = new Audio(KILLED_BY_GHOST_AUDIO);
+    killPacmanAudio.play();
 
     lives--;
     document.getElementById("livesVariable").innerHTML = lives;
@@ -896,7 +911,10 @@ function killPacman()
     }
     else
     {
+      myAudio.pause();
+
       gameMode = GAME_MODE_OVER;
+
       // Game Over stop all game components
       for (var i=0; i<ghosts.length; i++)
       {
@@ -1319,7 +1337,7 @@ function spawnAllGhosts()
         {
             pos = Math.floor(Math.random() * NUM_ROWS*NUM_COLUMNS);
 
-            // check function returns true if ghost in safetey zone
+            // check function returns true if ghost in safety zone
             safe = !checkIfGhostInSafetyZone(pos, SAFE_ZONE_SIZE);
         }
 
@@ -2156,3 +2174,24 @@ function myPoisonTimer(ghostId,squareNum,myPoisonCounter)
 // -------------------------------------------------
 
 // ************************************************************************
+
+function startGame()
+{
+    // Get rid of Start button
+    document.getElementById("startButtonSpan").innerHTML = "";
+
+    myAudio.src = BACKGROUND_AUDIO;
+    myAudio.loop = true;
+    myAudio.volume = .05;
+    // myAudio.muted = true;
+    myAudio.play();
+
+    startGoodBombTimer();
+
+    setTimeout( spawnAllGhosts, 2000);
+
+    updateScoreboard();
+
+    respawnPacmanTimer();
+
+}
