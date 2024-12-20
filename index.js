@@ -1,4 +1,5 @@
 // Release Notes
+// v1.17 12-14-24 - Added Wall Builder ghost
 // v1.16 12-8-24 - Added audio effects
 // v1.15 12-2-24  - Mostly minor bug fixes
 // v1.14 11-28-24 - Added Poison Ghost - reconfigured ghost logic
@@ -15,12 +16,12 @@
 // Jon's Pacman game ------------------------
 
 // Configurable game components
-const NUM_ROWS = 18;  // 14
-const NUM_COLUMNS = 34;  // 30
-const WALL_PCT = .20;   // % of walls on board
+const NUM_ROWS = 14;  // 14
+const NUM_COLUMNS = 30;  // 30
+const WALL_PCT = .15;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
-const NUM_GHOSTS = 5;   // number of ghosts to create on each level
-const GHOST_SMARTS = 80; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
+const NUM_GHOSTS = 10;   // number of ghosts to create on each level
+const GHOST_SMARTS = 70; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
 const GHOST_RESPAWN_DELAY = 4;  // delay in seconds for dead ghosts to respawn
 const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner when pacman spawns or respawns
 const GHOST_SPEED = 1;  // how often ghosts move in seconds
@@ -34,19 +35,21 @@ const BOMB_DELAY = 4;   // bombs blow up in this many seconds
 const GOOD_BOMB_DELAY = 10; // how frequently good bombs are dropped
 const GOOD_BOMB_DURATION = 9; // how many seconds a good bomb exists before disappearing
 const POISON_DELAY = 5;   // how many seconds poison lasts
-const POISON_PERCENT = .05; // How ofen poison ghost drops poison
+const POISON_PERCENT = .1; // How ofen poison ghost drops poison
+const WALL_BUILD_TIME = 4;  // # of seconds to build a wall
+const WALL_BUILD_PERCENT = .1; // How often wall builder ghost stops and builds a wall
 
 const GHOST_TYPE_NORMAL = 0;
 const GHOST_TYPE_RABID = 1;
 const GHOST_TYPE_POISON = 2;
+const GHOST_TYPE_WALL_BUILDER = 3;
+const NUM_GHOST_TYPES = 4;
 
 const BACKGROUND_AUDIO = "sounds/pacmanfever.mp3";
 const KILLED_BY_GHOST_AUDIO = "sounds/killedByGhost.mp3";
 
 var myAudio = new Audio; // ("sounds/pacmanfever.mp3");
 var musicStarted = false;
-
-
 
 // Global variables
 var current;    // pacman's current square
@@ -70,6 +73,7 @@ var ghostsEaten;
 var regGhostCount = 0;
 var rabidGhostCount = 0;
 var poisonGhostCount = 0;
+var wallBuilderGhostCount = 0;
 var goodBombTimerID;
 var cancelGoodBombTimerID;
 
@@ -101,6 +105,7 @@ var PACMAN_CLASSIC_LEFT_PP = "<img src='graphics/Pacman icon left PP.jpg'>";
 var PACMAN_CLASSIC_UP_PP = "<img src='graphics/Pacman icon up PP.jpg'>";
 var PACMAN_CLASSIC_DOWN_PP = "<img src='graphics/Pacman icon down PP.jpg'>";
 var ICON_WALL = "<img src='graphics/wallIcon.jpg'>";
+var ICON_WALL_WITH_PELLET = "<img src='graphics/wallIconWithPellet.jpg'>";
 var ICON_PELLET = "<img src='graphics/PelletIcon.jpg'>";
 var ICON_BOMB = "<img src='graphics/BombIcon1.jpg'>";
 var ICON_GOOD_BOMB = "<img src='graphics/GoodBombIcon.jpg'>";
@@ -111,7 +116,7 @@ var ICON_POISON = "<img src='graphics/poison.jpg'>";
 var ICON_GHOST = "<img src='graphics/blueGhost.jpg'>";
 var ICON_GHOST_RABID = "<img src='graphics/rabidGhost.jpg'>"
 var ICON_GHOST_POISON = "<img src='graphics/poisonGhost.jpg'>"
-
+var ICON_GHOST_WALL_BUILDER = "<img src='graphics/WallBuilderGhost.jpg'>"
 
 const GAME_MODE_POWER_OFF = 0;
 const GAME_MODE_POWER_ON = 1;
@@ -192,7 +197,7 @@ function checkKey(evt)
   //
   //     myAudio.src = BACKGROUND_AUDIO;
   //     // myAudio.muted = true;
-  //     myAudio.play(); // zzz
+  //     myAudio.play();
   // }
 
   // only intercept keys if pacman on the board
@@ -236,6 +241,7 @@ function updateScoreboard()
   document.getElementById("regGhostCount").innerHTML = regGhostCount;
   document.getElementById("rabidGhostCount").innerHTML = rabidGhostCount;
   document.getElementById("poisonGhostCount").innerHTML = poisonGhostCount;
+  document.getElementById("wallBuilderGhostCount").innerHTML = wallBuilderGhostCount;
 
 }
 
@@ -455,6 +461,7 @@ function resetBoard()
     regGhostCount = 0;
     rabidGhostCount = 0;
     poisonGhostCount = 0;
+    wallBuilderGhostCount = 0;
 
     // turn off PP if on
     if (myPowerPelletTimerVar != -1)
@@ -572,7 +579,6 @@ function respawnPacmanTimer()
 
 function redrawBoardPacman(oldSquare, newSquare)
 {
-    // zzz
     var bombFound = false;
     squares = document.querySelectorAll('.square');
 
@@ -928,7 +934,7 @@ function killPacman()
           // show last ghost that whacked pacman
           if (ghosts[i].squareNum == current)
           {
-            console.log("Last ghost that whacked pacman");
+            // console.log("Last ghost that whacked pacman");
             squares[current].innerHTML = getGhostIcon(ghosts[i].ghost_type);
           }
 
@@ -976,29 +982,47 @@ function eatGhosts()
 
       ghostsEaten++;
 
-      if (ghosts[i].ghost_type == GHOST_TYPE_POISON)
-      {
-        poisonGhostCount--;
-      }
-      else
-      {
-        if (ghosts[i].ghost_type == GHOST_TYPE_RABID)
-          rabidGhostCount--;
-        else
-          regGhostCount--;
-      }
+      score += POINTS_PER_GHOST;
 
-      updateScoreboard();
+      // zzz
+      // switch (ghosts[i].ghost_type)
+      // {
+      //
+      //   case GHOST_TYPE_POISON:
+      //
+      //       poisonGhostCount++;
+      //       break;
+      //
+      //     case GHOST_TYPE_RABID:
+      //
+      //         rabidGhostCount++;
+      //         break;
+      //
+      //     case GHOST_TYPE_WALL_BUILDER:
+      //
+      //         wallBuilderGhostCount++;
+      //         break;
+      //
+      //     case GHOST_TYPE_NORMAL:
+      //
+      //         regGhostCount++;
+      //         break;
+      //
+      //   default:
+      //
+      // }
 
       ghosts[i].squareNum = OFF_THE_BOARD;
       // console.log("Ate Ghost " + i + " in squarenum " + current + " total ghosts eaten is " + ghostsEaten + "  total ghosts created is " + ghostsCreated + " at " + (new Date()));
 
       // save respawn id in case need to clear out later
-      ghosts[i].respawnId = setTimeout( ghostRespawnTimer, GHOST_RESPAWN_DELAY *1000, ghosts[i].ghost_type);
+      ghosts[i].respawnId = setTimeout( ghostRespawnTimer, GHOST_RESPAWN_DELAY *1000, ghosts[i].ghost_type, ghosts[i].speed);
 
     }
 
   }  // end for loop
+
+  updateScoreboard();
 
 } // end function eatGhosts
 
@@ -1073,6 +1097,8 @@ function myBombTimer(bombIndex)
         // console.log("Bomb found in pacmans square");
         squares[current].innerHTML = "";
         killPacman();
+
+        // don't need to check for a pellet here because Pacman would have already eaten it
     }
 
     // check up only if not already in the top row  -------- up
@@ -1092,6 +1118,13 @@ function myBombTimer(bombIndex)
         walls[pos-NUM_COLUMNS] = 0;
         squares[pos-NUM_COLUMNS].innerHTML = "";
       }
+
+      // check for pellet (Wallbuilder ghost builds walls on pellets)
+      if (pellets[pos-NUM_COLUMNS] == 1)
+      {
+        squares[pos-NUM_COLUMNS].innerHTML = ICON_PELLET;
+      }
+
     }
 
     // check down ----------------------------------------
@@ -1115,6 +1148,13 @@ function myBombTimer(bombIndex)
         walls[pos+NUM_COLUMNS] = 0;
         squares[pos+NUM_COLUMNS].innerHTML = "";
       }
+
+      // check for pellet (Wallbuilder ghost builds walls on pellets)
+      if (pellets[pos+NUM_COLUMNS] == 1)
+      {
+        squares[pos+NUM_COLUMNS].innerHTML = ICON_PELLET;
+      }
+
     }
 
     // Check left ------------------------------------------
@@ -1136,6 +1176,12 @@ function myBombTimer(bombIndex)
         walls[pos-1] = 0;
         squares[pos-1].innerHTML = "";
       }
+
+      // check for pellet (Wallbuilder ghost builds walls on pellets)
+      if (pellets[pos-1] == 1)
+      {
+        squares[pos-1].innerHTML = ICON_PELLET;
+      }
     }
 
     // right -----------------------------------------------
@@ -1155,6 +1201,13 @@ function myBombTimer(bombIndex)
         walls[pos+1] = 0;
         squares[pos+1].innerHTML = "";
       }
+
+      // check for pellet (Wallbuilder ghost builds walls on pellets)
+      if (pellets[pos+1] == 1)
+      {
+        squares[pos+1].innerHTML = ICON_PELLET;
+      }
+
     }
 
     // actually blow up bomb, replace with blank square
@@ -1362,31 +1415,57 @@ function spawnGhost(squareNum)
   // generates a random number between -.4 and +.3
   var ghostRandomizer = ((Math.floor(Math.random() * 8))-4)/10;
 
-  // create timer thread
-  var tempTimerId = setInterval(ghostTick, GHOST_SPEED * 1000 * (1+ghostRandomizer), ghosts.length);
+  var ghostSpeed = GHOST_SPEED * 1000 * (1+ghostRandomizer);
 
-  // console.log("Ghost speed created " + GHOST_SPEED * 1000 * (1+ghostRandomizer));
+  // hard code ghost speed here
+  // var ghostSpeed = 1400; // GHOST_SPEED * 1000 * (1+ghostRandomizer);
+
+
+  // create timer thread
+  var tempTimerId = setInterval(ghostTick, ghostSpeed, ghosts.length);
+
+  console.log("Ghost speed created in spawnGhost " + ghostSpeed);
 
   // randomly determine which type of ghost
 
-  var tempGhostType = (Math.floor(Math.random() * 3));  // number of ghost types = 3
-  // var tempGhostType = 2;
+  var tempGhostType = (Math.floor(Math.random() * NUM_GHOST_TYPES));
 
-  if (tempGhostType == GHOST_TYPE_POISON)
-  {
-    poisonGhostCount++;
-    var poisonTimerIds = new Array;
-    ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId, respawnId: -1, poisonTimers: poisonTimerIds});
-  }
-  else
-  {
-    if (tempGhostType == GHOST_TYPE_RABID)
-      rabidGhostCount++;
-    else
-      regGhostCount++;
+  // hard code a test ghost here
+  // tempGhostType = GHOST_TYPE_WALL_BUILDER;
 
-    // push ghost onto array with it's timer id and location
-    ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId, respawnId: -1});
+  switch (tempGhostType) {
+
+    case GHOST_TYPE_POISON:
+
+        poisonGhostCount++;
+        var poisonTimerIds = new Array;
+        ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId, respawnId: -1, poisonTimers: poisonTimerIds, speed: ghostSpeed});
+
+        break;
+
+      case GHOST_TYPE_RABID:
+
+          rabidGhostCount++;
+          ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId, respawnId: -1, speed: ghostSpeed});
+
+          break;
+
+      case GHOST_TYPE_WALL_BUILDER:
+
+          wallBuilderGhostCount++;
+          ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId, respawnId: -1, wallTimerID: -1, wallTickCount: 0, speed: ghostSpeed});
+
+          break;
+
+      case GHOST_TYPE_NORMAL:
+
+          regGhostCount++;
+          ghosts.push({squareNum:squareNum, ghost_type: tempGhostType, timerID: tempTimerId, respawnId: -1, speed: ghostSpeed});
+
+          break;
+
+    default:
+
   }
 
   updateScoreboard();
@@ -1403,16 +1482,16 @@ function spawnGhost(squareNum)
 // ---------------------------------------------------------------------
 // Function used to delay the respawning of ghosts, passing in the type
 //
-function ghostRespawnTimer(type)
+function ghostRespawnTimer(type, speed)
 {
   // spawn a new ghost
-  reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)), type);
+  reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)), type, speed);
 
 }
 
 // ---------------------------------------------------------------------
 
-function reSpawnGhost(squareNum, ghostType)
+function reSpawnGhost(squareNum, ghostType, speed)
 {
   // make sure now spawing directly on pacman or within 1 square
 
@@ -1440,36 +1519,52 @@ function reSpawnGhost(squareNum, ghostType)
   var ghostRandomizer = ((Math.floor(Math.random() * 8))-4)/10;
 
   // create timer thread
-  var tempTimerId = setInterval(ghostTick, GHOST_SPEED * 1000 * (1+ghostRandomizer), ghosts.length);
+  var tempTimerId = setInterval(ghostTick, speed, ghosts.length);
 
-  // Handle poison ghost respawn
+  switch (ghostType) {
 
-  if (ghostType == GHOST_TYPE_POISON)
-  {
-    poisonGhostCount++;
-    var poisonTimerIds = new Array;
-    ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId, respawnId: -1, poisonTimers: poisonTimerIds});
-  }
-  else
-  {
-    if (ghostType == GHOST_TYPE_RABID)
-      rabidGhostCount++;
-    else
-      regGhostCount++;
+    case GHOST_TYPE_POISON:
 
-    // push ghost onto array with it's timer id and location
-    ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId, respawnId: -1});
+        // poisonGhostCount++;
+        var poisonTimerIds = new Array;
+        ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId, respawnId: -1, poisonTimers: poisonTimerIds, speed: speed});
+
+        break;
+
+      case GHOST_TYPE_RABID:
+
+          // rabidGhostCount++;
+          ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId, respawnId: -1, speed: speed});
+
+          break;
+
+      case GHOST_TYPE_WALL_BUILDER:
+
+          // wallBuilderGhostCount++;
+          ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId, respawnId: -1, wallTimerID: -1, wallTickCount: 0, speed: speed});
+
+          break;
+
+      case GHOST_TYPE_NORMAL:
+
+          // regGhostCount++;
+          ghosts.push({squareNum:squareNum, ghost_type: ghostType, timerID: tempTimerId, respawnId: -1, speed: speed});
+
+          break;
+
+    default:
+
   }
 
   updateScoreboard();
 
-  // console.log("Ghost speed created " + GHOST_SPEED * 1000 * (1+ghostRandomizer));
+  console.log("Ghost speed created in reSpawnGhost " + speed);
   // var temp = new String((ghosts.length)-1);
   // console.log("New ghost num " + temp + " of type " + ghostType + " spawned in square " + squareNum + "  total ghosts created is " + ghostsCreated + " at " + " at " + (new Date()));
 
   // Later redraws are handled by the tick timer function
 
-} // end function spawnGhost
+} // end function reSpawnGhost
 
 // ---------------------------------------------------------------------
 // function called for each ghost, each tick.
@@ -1483,6 +1578,30 @@ function ghostTick(ghostId)
 
   // console.log("Ghost tick called for ghost id " + ghostId);
   // console.log(ghosts);
+
+  // Check if wall builder ghost and not time to build, then increment counter and return
+
+  if (ghosts[ghostId].ghost_type == GHOST_TYPE_WALL_BUILDER)
+  {
+    if ((ghosts[ghostId].wallTimerID != -1) && (ghosts[ghostId].wallTickCount != WALL_BUILD_TIME))
+    {
+      ghosts[ghostId].wallTickCount++;
+
+      // Show the icon again just in case it was replaced with a good bomb, unless off the board
+      if (ghosts[ghostId].squareNum != OFF_THE_BOARD)
+      {
+        squares = document.querySelectorAll('.square');
+        squares[ghosts[ghostId].squareNum].innerHTML = ICON_GHOST_WALL_BUILDER;
+      }
+
+      return;
+    }
+    else
+    {
+      ghosts[ghostId].wallTimerID = -1;
+      ghosts[ghostId].wallTickCount = 0;
+    }
+  }
 
   // loop until a legal move is found or 15 tries
   while ((legalMove == FAIL) && (tries < 15) && (ghosts[ghostId].squareNum != OFF_THE_BOARD))
@@ -1629,6 +1748,23 @@ function resolveGhost(ghostId,dir)
         break;
 
     } // end switch
+
+    // if wall builder ghost, determine whether to build a wall
+    if (ghosts[ghostId].ghost_type == GHOST_TYPE_WALL_BUILDER)
+    {
+      var wallCheck = Math.floor(Math.random() * 100) + 1;
+      // console.log("Check is " + wallCheck);
+
+      // if check, try to build wall
+      if (wallCheck < WALL_BUILD_PERCENT * 100)
+      {
+          // launch timer to build wall
+          var tempWallTimerId = setTimeout(myWallBuildTimer, WALL_BUILD_TIME * ghosts[ghostId].speed * .98, ghostId);
+          ghosts[ghostId].wallTimerID = tempWallTimerId;
+
+      } // end if wallCheck
+
+    } // end if wall builder ghost type
 
 }   // end function resolveGhost
 
@@ -1975,7 +2111,7 @@ function checkForGhost()
         ghosts[ghostId].squareNum = OFF_THE_BOARD;
 
         // spawn a new ghost
-        reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)), ghosts[ghostId].ghost_type);  // return any square on board
+        reSpawnGhost(Math.floor(Math.random() * (NUM_ROWS*NUM_COLUMNS)), ghosts[ghostId].ghost_type, ghosts[ghostId].speed);  // return any square on board
 
       }
       else
@@ -2037,6 +2173,12 @@ function clearGhostTimers()
         }
       }
 
+      if (ghosts[i].ghost_type == GHOST_TYPE_WALL_BUILDER)
+      {
+        if (ghosts[i].wallTimerID != -1)
+          clearTimeout(ghosts[i].wallTimerID);
+      }
+
     }  // end for loop
 
 } // end function
@@ -2089,6 +2231,11 @@ function getGhostIcon(type)
     case GHOST_TYPE_POISON:
 
         return ICON_GHOST_POISON;
+        break;
+
+    case GHOST_TYPE_WALL_BUILDER:
+
+        return ICON_GHOST_WALL_BUILDER;
         break;
 
     default:
@@ -2169,6 +2316,145 @@ function myPoisonTimer(ghostId,squareNum,myPoisonCounter)
 
 // -------------------------------------------------
 
+function myWallBuildTimer(ghostId)
+{
+    var spotFound = false;
+    var numTries = 0;
+
+    if (ghosts[ghostId].squareNum == OFF_THE_BOARD)
+      return;
+
+    var dir = Math.floor(Math.random() * 4);  // returns a random int between 0 and 3
+
+    while ((spotFound == false) && (numTries < 4))
+    {
+        switch (dir)
+        {
+          case RIGHT:
+
+              if ((checkIfSquareOKforWall((ghosts[ghostId].squareNum)+1) == true) && (((ghosts[ghostId].squareNum + 1) % NUM_COLUMNS) != 0))
+              {
+                spotFound = true;
+                walls[(ghosts[ghostId].squareNum)+1] = 1;
+                redrawWallSquare((ghosts[ghostId].squareNum)+1);
+              }
+              else
+              {
+                  numTries++;
+                  dir = (dir+1) % 4;
+              }
+
+              break;
+
+          case LEFT:
+
+              if ((checkIfSquareOKforWall((ghosts[ghostId].squareNum)-1) == true) && ((ghosts[ghostId].squareNum % NUM_COLUMNS) != 0))
+              {
+                spotFound = true;
+                walls[(ghosts[ghostId].squareNum)-1] = 1;
+                redrawWallSquare((ghosts[ghostId].squareNum)-1);
+              }
+              else
+              {
+                  numTries++;
+                  dir = (dir+1) % 4;
+              }
+
+              break;
+
+          case UP:
+
+              if ((checkIfSquareOKforWall((ghosts[ghostId].squareNum)-NUM_COLUMNS) == true) && (ghosts[ghostId].squareNum >= NUM_COLUMNS))
+              {
+                spotFound = true;
+                walls[(ghosts[ghostId].squareNum)-NUM_COLUMNS] = 1;
+                redrawWallSquare((ghosts[ghostId].squareNum)-NUM_COLUMNS);
+              }
+              else
+              {
+                  numTries++;
+                  dir = (dir+1) % 4;
+              }
+
+              break;
+
+          case DOWN:
+
+              if ((checkIfSquareOKforWall((ghosts[ghostId].squareNum)+NUM_COLUMNS) == true) && ((ghosts[ghostId].squareNum < NUM_COLUMNS * (NUM_ROWS-1))))
+              {
+                spotFound = true;
+                walls[(ghosts[ghostId].squareNum)+NUM_COLUMNS] = 1;
+                redrawWallSquare((ghosts[ghostId].squareNum)+NUM_COLUMNS);
+              }
+              else
+              {
+                  numTries++;
+                  dir = (dir+1) % 4;
+              }
+
+              break;
+
+          default:
+
+        } // end switch
+
+    }   // end while
+
+}  // end function checkIfBuildWall
+
+// ------------------------------------------------
+//
+function checkIfSquareOKforWall(squareNum)
+{
+  // can't build a wall on a wall
+  if (walls[squareNum] == 1)
+    return false;
+
+  // can't build a wall on a tunnel
+  if ((tunnel1num == squareNum) || (tunnel2num == squareNum))
+    return false;
+
+  // can't build a wall on pacman
+  if (current == squareNum)
+    return false;
+
+  // check for ghosts
+  for (i=0;i<ghosts.length;i++)
+  {
+    if (ghosts[i].squareNum == squareNum)
+      return false;
+  }
+
+  // check for bombs, good bombs, powerpellets
+
+  if (bombs[squareNum] == 1)
+      return false;
+
+  if (goodBombs[squareNum] == 1)
+      return false;
+
+  if (powerPellets[squareNum] == 1)
+      return false;
+
+  // all checks failed, square ok, return true
+  return true;
+}
+
+// ------------------------------------------------
+//
+function redrawWallSquare(squareNum)
+{
+    squares = document.querySelectorAll('.square');  // get squares
+
+    if (pellets[squareNum] == 0)
+      squares[squareNum].innerHTML = ICON_WALL;
+    else
+      squares[squareNum].innerHTML = ICON_WALL_WITH_PELLET;
+
+}
+
+// end function redrawWallSquare --------------------
+
 // -------------------------------------------------
 // ---------  End Ghost function section ---------
 // -------------------------------------------------
@@ -2182,7 +2468,7 @@ function startGame()
 
     myAudio.src = BACKGROUND_AUDIO;
     myAudio.loop = true;
-    myAudio.volume = .05;
+    myAudio.volume = .4;
     // myAudio.muted = true;
     myAudio.play();
 
