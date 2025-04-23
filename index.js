@@ -16,18 +16,20 @@
 // Jon's Pacman game ------------------------
 
 // Configurable game components
-const NUM_ROWS = 14;  // 14
-const NUM_COLUMNS = 30;  // 30
-const WALL_PCT = .15;   // % of walls on board
+const GAME_LENGTH = 10 // minutes;
+const NUM_ROWS = 12;  // 12
+const NUM_COLUMNS = 26;  // 26
+const WALL_PCT = .19;   // % of walls on board
 const SQUARE_SIZE = 50;  // pixel size of individual squares
-const NUM_GHOSTS = 10;   // number of ghosts to create on each level
+const NUM_GHOSTS = 9;   // 9 or 10 for prod - number of ghosts to create on each level
 const GHOST_SMARTS = 70; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
 const GHOST_RESPAWN_DELAY = 4;  // delay in seconds for dead ghosts to respawn
 const SAFE_ZONE_SIZE = 4; // rows/columns of safety in upper left corner when pacman spawns or respawns
 const GHOST_SPEED = 1;  // how often ghosts move in seconds
 const RESET_PLAYER_DELAY = 3; // seconds
 const LIVES_START = 3;
-const BOMBS_START_COUNT = 10;
+const EXTRA_LIFE_POINTS = 500;
+const BOMBS_START_COUNT = 15;
 const POWER_PELLETS_START_COUNT = Math.floor(((NUM_ROWS*NUM_COLUMNS)+1)/40);  // num of pp per board, 1 per 40 squares
 const POINTS_PER_GHOST = 10;
 const POWER_PELLET_DELAY = 8; // pacman gets this many seconds to kill ghosts after eating pp
@@ -47,15 +49,19 @@ const NUM_GHOST_TYPES = 4;
 
 const BACKGROUND_AUDIO = "sounds/pacmanfever.mp3";
 const KILLED_BY_GHOST_AUDIO = "sounds/killedByGhost.mp3";
+const EAT_GHOST_AUDIO = "sounds/eatghost.mp3";
 
 var myAudio = new Audio; // ("sounds/pacmanfever.mp3");
 var musicStarted = false;
 
 // Global variables
+var gameStatus = 0; // 0 = over or not started, 1 = running
 var current;    // pacman's current square
 var lives;      // pacman's current # of lives remaining
+var extraLife = 0; // denotes whether player earned the 1 extra life
 var level;      // the board level
 var bombCount;  // number of pacmans bombs
+var timerSeconds = GAME_LENGTH * 60; // how many seconds left in the game
 
 var squares;        // represents the squares on the board
 var score;
@@ -70,6 +76,7 @@ var tunnel2num;
 var myPowerPelletTimerVar;  // used to end pp phase
 var ghostsCreated;
 var ghostsEaten;
+var totalGhostSpeed = 0;
 var regGhostCount = 0;
 var rabidGhostCount = 0;
 var poisonGhostCount = 0;
@@ -173,6 +180,8 @@ createTunnel();
 
 drawInitialBoard();
 
+launchWallCheckerTimer();
+
 // Wait here for start button click
 
 // End Driver section
@@ -200,8 +209,8 @@ function checkKey(evt)
   //     myAudio.play();
   // }
 
-  // only intercept keys if pacman on the board
-  if (current != OFF_THE_BOARD)
+  // only intercept keys if pacman on the board and game not over
+  if ((current != OFF_THE_BOARD) && (gameStatus == 1))
   {
     if (resolvePacMan(evt.keyCode))           // resolvePacMan returns a 1 if success
        redrawBoardPacman(oldCurr, current);    // only redraw board if necessary
@@ -242,6 +251,9 @@ function updateScoreboard()
   document.getElementById("rabidGhostCount").innerHTML = rabidGhostCount;
   document.getElementById("poisonGhostCount").innerHTML = poisonGhostCount;
   document.getElementById("wallBuilderGhostCount").innerHTML = wallBuilderGhostCount;
+
+  // zzz
+  document.getElementById("aveGhostSpeed").innerHTML = Math.floor(totalGhostSpeed/NUM_GHOSTS);
 
 }
 
@@ -298,6 +310,62 @@ function buildWallsAndPellets()
   }
 
 } // end function buildWallsAndPellets
+
+// ----------------------------------------------------------------------
+
+
+function launchWallCheckerTimer()
+{
+    // setTimeout(wallCheckerFunction, 5000);
+    setInterval(wallCheckerFunction, 1000);
+
+}
+
+// -----------------------------------------------------------------------
+// Runs every second to make sure all wall cells show correctly
+
+function wallCheckerFunction()
+{
+    squares = document.querySelectorAll('.square');
+    var found = 0;
+    var temp;
+    var newString;  // convert html to proper format
+
+    for (i=0;i<walls.length;i++)
+    {
+        temp = squares[i].innerHTML;
+        newString = temp.replace(/"/g, "'");
+
+//           console.log("Square num " + i + " wall " + walls[0] + " bool wall only " + (newString == ICON_WALL));
+
+          if (walls[i] == 1)
+          {
+              if ((pellets[i] == 1) && (newString != ICON_WALL_WITH_PELLET))
+              {
+                  squares[i].innerHTML = ICON_WALL_WITH_PELLET;
+                  console.log("Wall with pellet scenario fixed.");
+                  found = 1;
+              }
+              else
+              {
+                if ((pellets[i] == 0) && (newString != ICON_WALL))
+                {
+                  squares[i].innerHTML = ICON_WALL;
+                  console.log("Wall without pellet scenario fixed.");
+                  found = 1;
+                }
+              } // end else
+
+          } // end if walls
+
+    }   // end for loop
+
+    // if (found == 0)
+    //   console.log("No missing walls found");
+
+} // end function
+
+// ----------------------------------------------------------------------
 
 // -------------------------------------------------------------------------
 // This function creates the power pellets, good bombs, and poison arrays
@@ -462,6 +530,7 @@ function resetBoard()
     rabidGhostCount = 0;
     poisonGhostCount = 0;
     wallBuilderGhostCount = 0;
+    totalGhostSpeed = 0;
 
     // turn off PP if on
     if (myPowerPelletTimerVar != -1)
@@ -619,7 +688,13 @@ function checkForPellets()
     if (pellets[current] == 1)
     {
         pelletsEaten++;
-        score++;
+
+        if ((++score >= EXTRA_LIFE_POINTS) && (extraLife == 0))
+        {
+          extraLife = 1;
+          document.getElementById("livesVariable").innerHTML = ++lives;
+        }
+
         document.getElementById("scoreVariable").innerHTML = score;
         pellets[current] = 0;
     }
@@ -628,7 +703,13 @@ function checkForPellets()
       if (powerPellets[current] == 1)
       {
           gameMode = GAME_MODE_POWER_ON;
-          score++;
+
+          if ((++score >= EXTRA_LIFE_POINTS) && (extraLife == 0))
+          {
+            extraLife = 1;
+            document.getElementById("livesVariable").innerHTML = ++lives;
+          }
+
           document.getElementById("scoreVariable").innerHTML = score;
           powerPellets[current] = 0;
           numPowerPelletsEaten++;
@@ -898,6 +979,7 @@ function resolvePacMan(direction)
 function killPacman()
 {
     var killPacmanAudio = new Audio(KILLED_BY_GHOST_AUDIO);
+    killPacmanAudio.volume = .2;
     killPacmanAudio.play();
 
     lives--;
@@ -984,7 +1066,20 @@ function eatGhosts()
 
       score += POINTS_PER_GHOST;
 
-      // zzz
+      if ((score >= EXTRA_LIFE_POINTS) && (extraLife == 0))
+      {
+        extraLife = 1;
+        document.getElementById("livesVariable").innerHTML = ++lives;
+      }
+
+      var eatGhostAudio = new Audio(EAT_GHOST_AUDIO);
+
+      eatGhostAudio.volume = .2;
+
+      eatGhostAudio.play();
+
+
+      // zzzz
       // switch (ghosts[i].ghost_type)
       // {
       //
@@ -1414,17 +1509,21 @@ function spawnGhost(squareNum)
 
   // generates a random number between -.4 and +.3
   var ghostRandomizer = ((Math.floor(Math.random() * 8))-4)/10;
+  // var ghostRandomizer = 0; // ((Math.floor(Math.random() * 8))-4)/10;
 
-  var ghostSpeed = GHOST_SPEED * 1000 * (1+ghostRandomizer);
+  var ghostSpeed = GHOST_SPEED * 1000 * (1 + ghostRandomizer) * (1-((level-1)*.06));
+  // var ghostSpeed = GHOST_SPEED * 1000 * (1 + ghostRandomizer); // * (1-((level-1)*.06));
+  // console.log("Randomizer is " + ghostRandomizer + " Ghost speed is " + ghostSpeed + " level is " + level);
 
   // hard code ghost speed here
-  // var ghostSpeed = 1400; // GHOST_SPEED * 1000 * (1+ghostRandomizer);
+  // var ghostSpeed = 500; // GHOST_SPEED * 1000 * (1+ghostRandomizer);
 
+  totalGhostSpeed += ghostSpeed;
 
   // create timer thread
   var tempTimerId = setInterval(ghostTick, ghostSpeed, ghosts.length);
 
-  console.log("Ghost speed created in spawnGhost " + ghostSpeed);
+  // console.log("Ghost speed created in spawnGhost " + ghostSpeed);
 
   // randomly determine which type of ghost
 
@@ -1493,8 +1592,11 @@ function ghostRespawnTimer(type, speed)
 
 function reSpawnGhost(squareNum, ghostType, speed)
 {
-  // make sure now spawing directly on pacman or within 1 square
+  // check if game over
+  if (gameStatus == 0)
+    return;
 
+  // make sure now spawing directly on pacman or within 1 square
   ghostsCreated++;
   var safeSquareFound = false;
 
@@ -1578,6 +1680,10 @@ function ghostTick(ghostId)
 
   // console.log("Ghost tick called for ghost id " + ghostId);
   // console.log(ghosts);
+
+  // check if game over
+  if (gameStatus == 0)
+    return;
 
   // Check if wall builder ghost and not time to build, then increment counter and return
 
@@ -2315,6 +2421,7 @@ function myPoisonTimer(ghostId,squareNum,myPoisonCounter)
 
 
 // -------------------------------------------------
+// zzz
 
 function myWallBuildTimer(ghostId)
 {
@@ -2463,8 +2570,14 @@ function redrawWallSquare(squareNum)
 
 function startGame()
 {
+    gameStatus = 1; // on
+
     // Get rid of Start button
     document.getElementById("startButtonSpan").innerHTML = "";
+
+    document.getElementById("timer").innerHTML = GAME_LENGTH + ":00";
+
+    setInterval(timerFunction, 1000);
 
     myAudio.src = BACKGROUND_AUDIO;
     myAudio.loop = true;
@@ -2480,4 +2593,28 @@ function startGame()
 
     respawnPacmanTimer();
 
+}
+
+// ----------------------------------------------------
+
+function timerFunction()
+{
+    timerSeconds--;
+
+    if (timerSeconds < 0)
+      return;
+
+    var mins = Math.floor(timerSeconds / 60);
+
+    var secs = Math.floor(timerSeconds % 60);
+
+    if (secs < 10)
+      secs = "0" + secs;
+
+    document.getElementById("timer").innerHTML = mins + ":" + secs;
+
+    if ((mins == 0) && (secs == 0))
+    {
+      gameStatus = 0; // over
+    }
 }
