@@ -19,6 +19,7 @@
 const TEST = "TEST";
 const PROD = "PROD";
 var testOrProd = PROD; // TEST or PROD
+var timerOnOrOff = 0;
 
 var GAME_LENGTH = 10; // minutes
 var NUM_ROWS = 12;  // 12
@@ -40,8 +41,8 @@ var POWER_PELLET_DELAY = 8; // pacman gets this many seconds to kill ghosts afte
 const BOMB_DELAY = 4;   // bombs blow up in this many seconds
 const GOOD_BOMB_DELAY = 10; // how frequently good bombs are dropped
 const GOOD_BOMB_DURATION = 9; // how many seconds a good bomb exists before disappearing
-const POISON_DELAY = 5;   // how many seconds poison lasts
-const POISON_PERCENT = .1; // How ofen poison ghost drops poison
+var POISON_DELAY = 5;   // how many seconds poison lasts
+var POISON_PERCENT = .1; // How ofen poison ghost drops poison
 const WALL_BUILD_TIME = 4;  // # of seconds to build a wall
 const WALL_BUILD_PERCENT = .1; // How often wall builder ghost stops and builds a wall
 
@@ -237,16 +238,20 @@ function setTestOrProdVars()
   if (testOrProd == TEST)
   {
     GAME_LENGTH = 10 // minutes;
-    NUM_ROWS = 5;  // 12
-    NUM_COLUMNS = 5;  // 26
-    WALL_PCT = .01;   // % of walls on board
-    NUM_GHOSTS = 1;   // 9 or 10 for prod - number of ghosts to create on each level
-    GHOST_SMARTS = 70; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
-    LIVES_START = 3;
+    NUM_ROWS = 6;  // 12
+    NUM_COLUMNS = 6;  // 26
+    WALL_PCT = .00;   // % of walls on board
+    NUM_GHOSTS = 5;   // 9 or 10 for prod - number of ghosts to create on each level
+    GHOST_SMARTS = 10; // % of time ghost moves towards pacman during regular mode or away from pacman during pp mode
+    LIVES_START = 10;
     EXTRA_LIFE_POINTS = 500;
     BOMBS_START_COUNT = 15;
-    POWER_PELLETS_START_COUNT = 3;
+    POWER_PELLETS_START_COUNT = 6;
+    numPowerPellets = 6;
+    lives = 15;
     POWER_PELLET_DELAY = 8; // pacman gets this many seconds to kill ghosts after eating pp
+    POISON_DELAY = 8;   // how many seconds poison lasts
+    POISON_PERCENT = .5; // How ofen poison ghost drops poison
 
   }
 
@@ -342,8 +347,6 @@ function buildWallsAndPellets()
     pellets[NUM_COLUMNS] = 1;
     totalPellets++;
   }
-
-  // zzzz
 
   var tempString = "";
 
@@ -626,12 +629,25 @@ function spawnPacman()
     var i = 0;
     squares = document.querySelectorAll('.square');
 
+    var timeNow = getTime();
+    // console.log("Spawn pacman called at " + timeNow);
+
     // put pacman on first square not a wall
 
     while (i < walls.length)
     {
       if ((walls[i] == 0) && (powerPellets[i] == 0))
       {
+        // Check for poison first, if found, remove it
+        if (poison[i] == 1)
+        {
+          poison[i] = 0;
+
+          var timeNow = getTime();
+
+          console.log("Poison reversed before spawn. " + timeNow)
+        }
+
         current = i;
         pacmanIcon = PACMAN_CLASSIC_RIGHT;
         squares[current].innerHTML = pacmanIcon;
@@ -1131,8 +1147,6 @@ function eatGhosts()
 
       eatGhostAudio.play();
 
-
-      // zzzz
       // switch (ghosts[i].ghost_type)
       // {
       //
@@ -1582,8 +1596,11 @@ function spawnGhost(squareNum)
 
   var tempGhostType = (Math.floor(Math.random() * NUM_GHOST_TYPES));
 
-  // hard code a test ghost here
-  // tempGhostType = GHOST_TYPE_WALL_BUILDER;
+  if (testOrProd == TEST)
+  {
+    // hard code a test ghost here
+    tempGhostType = GHOST_TYPE_POISON;
+  }
 
   switch (tempGhostType) {
 
@@ -2458,32 +2475,43 @@ function myPoisonTimer(ghostId,squareNum,myPoisonCounter)
 {
     //console.log("Poison timer called for poison in square " + squareNum);
 
-    poison[squareNum] = 0;
-    ghosts[ghostId].poisonTimers[myPoisonCounter] = -1;  // reset
+    // Need to check if square still has poison.  May have been dropped in
+    // Pacman's respawn square and then reversed.  If 0, do nothing
 
-    squares = document.querySelectorAll('.square');  // faster to get first?
+    if (poison[squareNum] == 1)
+    {
 
-    if (goodBombs[squareNum] == 1)
-    {
-        squares[squareNum].innerHTML = ICON_GOOD_BOMB;
-    }
-    else
-    {
-        // check for pellet
-        if (pellets[squareNum] == 1)
-        {
-            squares[squareNum].innerHTML = ICON_PELLET;
-        }
-        else  // no pellet
-        {
-            if (powerPellets[squareNum] == 1)
-            {
-                squares[squareNum].innerHTML = ICON_POWER_PELLET;
-            }
-            else {
-              squares[squareNum].innerHTML = "";
-            }
-        }
+      poison[squareNum] = 0;
+      ghosts[ghostId].poisonTimers[myPoisonCounter] = -1;  // reset
+
+      squares = document.querySelectorAll('.square');  // faster to get first?
+
+      if (goodBombs[squareNum] == 1)
+      {
+          squares[squareNum].innerHTML = ICON_GOOD_BOMB;
+      }
+      else
+      {
+          // check for pellet
+          if (pellets[squareNum] == 1)
+          {
+              squares[squareNum].innerHTML = ICON_PELLET;
+          }
+          else  // no pellet
+          {
+              if (powerPellets[squareNum] == 1)
+              {
+                  squares[squareNum].innerHTML = ICON_POWER_PELLET;
+              }
+              else {
+                squares[squareNum].innerHTML = "";
+              }
+          }
+      }
+
+    } // end check if still poison
+    else {
+      console.log("Poison removed scenario. No Timer work done.");
     }
 
 }   // end pp timer function
@@ -2693,7 +2721,7 @@ function timerFunction()
 
     document.getElementById("timer").innerHTML = mins + ":" + secs;
 
-    if ((mins == 0) && (secs == 0))
+    if ((mins == 0) && (secs == 0) && (timerOnOrOff == 1))
     {
       gameStatus = 0; // over
       myAudio.pause();
@@ -2788,3 +2816,22 @@ function dumpStatus(wallNum)
   // tempString = "";
 
 } // end function dump status
+
+// ------------------------------------------
+//
+function getTime()
+{
+  var date = new Date();
+
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true // To display time in 12-hour format with AM/PM
+  });
+
+  return timeFormatter.format(date);
+
+  // console.log("Spawn pacman called at " + formattedTime);
+
+}
